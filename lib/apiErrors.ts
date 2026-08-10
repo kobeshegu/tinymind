@@ -16,6 +16,7 @@ export const ErrorCodes = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   BAD_REQUEST: 'BAD_REQUEST',
   FORBIDDEN: 'FORBIDDEN',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
 } as const;
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
@@ -54,6 +55,14 @@ export class ApiError extends Error {
   static internal(message = 'Internal server error'): ApiError {
     return new ApiError(500, ErrorCodes.INTERNAL_ERROR, message);
   }
+
+  static serviceUnavailable(message = 'Service temporarily unavailable'): ApiError {
+    return new ApiError(503, ErrorCodes.SERVICE_UNAVAILABLE, message);
+  }
+}
+
+export function isApiErrorStatus(error: unknown, statusCode: number): error is ApiError {
+  return error instanceof ApiError && error.statusCode === statusCode;
 }
 
 /**
@@ -102,7 +111,7 @@ export function createErrorResponse(
       );
     }
 
-    if (status === 403) {
+    if (status === 403 || status === 429) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.', code: ErrorCodes.RATE_LIMITED },
         { status: 429, headers }
@@ -125,7 +134,9 @@ export function createErrorResponse(
   }
 
   // Generic error - NEVER expose stack trace in production
-  const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+  const message = isDev && error instanceof Error
+    ? error.message
+    : 'An unexpected error occurred';
 
   return NextResponse.json(
     { error: message, code: ErrorCodes.INTERNAL_ERROR },

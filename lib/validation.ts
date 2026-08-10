@@ -9,6 +9,10 @@ const safePathSegment = z.string()
     'Invalid path: directory traversal not allowed'
   )
   .refine(
+    (val) => !/%2e%2e|%2f|%5c/i.test(val),
+    'Invalid path: encoded path separators are not allowed'
+  )
+  .refine(
     (val) => !/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(val),
     'Invalid path: reserved name not allowed'
   );
@@ -27,19 +31,11 @@ export const blogPostSchema = z.object({
     .max(100000, 'Content must be 100,000 characters or less'),
 });
 
-// Blog post ID validation (decodes and validates path safety)
+// URLSearchParams and route handling decode exactly once before validation.
+// Decoding again here corrupts legitimate filenames containing a literal `%`.
 export const blogIdSchema = z.string()
   .min(1, 'Blog ID is required')
   .max(500, 'Blog ID too long')
-  .transform((val) => {
-    try {
-      const decoded = decodeURIComponent(val);
-      return decoded;
-    } catch {
-      // Throw explicitly on invalid URL encoding to prevent bypass
-      throw new Error('Invalid URL encoding in blog ID');
-    }
-  })
   .pipe(safePathSegment);
 
 // Thought validation

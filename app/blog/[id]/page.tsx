@@ -1,4 +1,5 @@
 import BlogPostClient from "./BlogPostClient";
+import { decodeRouteSegment } from "@/lib/content";
 
 export default async function BlogPost({
   params,
@@ -6,5 +7,5 @@ export default async function BlogPost({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <BlogPostClient id={id} />;
+  return <BlogPostClient id={decodeRouteSegment(id)} />;
 }

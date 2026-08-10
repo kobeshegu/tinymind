@@ -1,6 +1,4 @@
-import React, { HTMLAttributes } from "react";
-import { SyntaxHighlighter } from "@/components/shared/syntaxHighlighter";
-import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
+import React, { HTMLAttributes, lazy, Suspense } from "react";
 import { transformGithubImageUrl } from "@/lib/urlUtils";
 
 interface CodeProps extends HTMLAttributes<HTMLElement> {
@@ -9,16 +7,26 @@ interface CodeProps extends HTMLAttributes<HTMLElement> {
   children?: React.ReactNode;
 }
 
-const syntaxStyle = tomorrow as { [key: string]: React.CSSProperties };
+const HighlightedCode = lazy(
+  () => import("@/components/shared/HighlightedCode")
+);
 
 /** Shared by the plain and math-capable renderers so they stay identical. */
 export const markdownComponents = {
   code: ({ inline, className, children, ...props }: CodeProps) => {
-    const match = /language-(\w+)/.exec(className || "");
+    const match = /language-([^\s]+)/.exec(className || "");
     return !inline && match ? (
-      <SyntaxHighlighter style={syntaxStyle} language={match[1]} PreTag="div">
-        {String(children).replace(/\n$/, "")}
-      </SyntaxHighlighter>
+      <Suspense
+        fallback={
+          <code className={className} {...props}>
+            {children}
+          </code>
+        }
+      >
+        <HighlightedCode language={match[1]}>
+          {String(children).replace(/\n$/, "")}
+        </HighlightedCode>
+      </Suspense>
     ) : (
       <code className={className} {...props}>
         {children}
@@ -42,26 +50,14 @@ export const markdownComponents = {
   ),
   img: (props: { src?: string; alt?: string }) => {
     const transformedSrc = transformGithubImageUrl(props.src);
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img {...props} src={transformedSrc} alt={props.alt || "image"} />;
+    return (
+      <img
+        {...props}
+        src={transformedSrc}
+        alt={props.alt || "image"}
+        loading="lazy"
+        decoding="async"
+      />
+    );
   },
 };
-
-/**
- * Whether the content needs KaTeX.
- *
- * KaTeX plus its stylesheet is ~77 KB gzip, and most posts contain no math at
- * all, so it is loaded on demand. The patterns mirror remark-math's delimiters:
- * a bare "$" as in "$25" does not qualify, since inline math needs a closing
- * delimiter on the same line with no space after the opening one. Guessing
- * wrong in the "yes" direction only costs a download, so err that way.
- */
-export function containsMath(content: string): boolean {
-  return (
-    /\$\$/.test(content) ||
-    /\$[^\s$][^$\n]*\$/.test(content) ||
-    /\\\(/.test(content) ||
-    /\\\[/.test(content) ||
-    /\\begin\{/.test(content)
-  );
-}

@@ -178,6 +178,12 @@ export async function GET(request: NextRequest) {
         }
         const validatedId = blogIdSchema.parse(id);
         const post = await getBlogPost(validatedId, session.accessToken);
+        if (!post) {
+          return NextResponse.json(
+            { error: 'Blog post not found', code: ErrorCodes.NOT_FOUND },
+            { status: 404, headers }
+          );
+        }
         return NextResponse.json(post, { headers });
       }
 

@@ -1,8 +1,8 @@
-import Header from "@/components/Header";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getIconUrlsForUsername } from "@/lib/githubApi";
 import { usernameSchema } from "@/lib/validation";
+import { assertPublicProfile, isPublicProfileNotFound } from "@/lib/publicData";
 
 export async function generateMetadata({
   params,
@@ -12,6 +12,14 @@ export async function generateMetadata({
   const { username } = await params;
   if (!usernameSchema.safeParse(username).success) {
     return { title: "Not Found", robots: { index: false, follow: false } };
+  }
+  try {
+    await assertPublicProfile(username);
+  } catch (error) {
+    if (isPublicProfileNotFound(error)) {
+      return { title: "Not Found", robots: { index: false, follow: false } };
+    }
+    throw error;
   }
   const { iconPath } = await getIconUrlsForUsername(username);
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
@@ -83,10 +91,5 @@ export default async function UserLayout({
     notFound();
   }
 
-  return (
-    <>
-      <Header username={username} />
-      <div className="pt-20 max-w-4xl mx-auto px-4 py-8">{children}</div>
-    </>
-  );
+  return children;
 }

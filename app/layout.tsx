@@ -25,6 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
 
   return {
+    metadataBase: new URL(baseUrl),
     title,
     description,
     manifest: "/manifest.json",

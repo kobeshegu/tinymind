@@ -1,21 +1,10 @@
 import { Metadata } from "next";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
-import { transformGithubImageUrl } from "@/lib/urlUtils";
-import React, { HTMLAttributes } from "react";
-import { getPublicAboutPage } from "@/lib/publicData";
+import { getPublicAboutPage, isPublicProfileNotFound } from "@/lib/publicData";
+import { notFound } from "next/navigation";
+import { ServerMarkdownRenderer } from "@/components/shared/ServerMarkdownRenderer";
 
 export const revalidate = 60;
-
-interface CodeProps extends HTMLAttributes<HTMLElement> {
-  inline?: boolean;
-  className?: string;
-  children?: React.ReactNode;
-}
 
 export async function generateMetadata({
   params,
@@ -65,89 +54,16 @@ export default async function PublicAboutPage({
 }) {
   const { username } = await params;
 
+  let aboutPage;
   try {
-    const aboutPage = await getPublicAboutPage(username);
-
-    if (!aboutPage) {
-      return (
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>About {username}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500">
-                {username} hasn&apos;t written an about page yet.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>About {username}</CardTitle>
-          </CardHeader>
-          <CardContent className="prose max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-              components={{
-                code: ({
-                  inline,
-                  className,
-                  children,
-                  ...props
-                }: CodeProps) => {
-                  const match = /language-(\w+)/.exec(className || "");
-                  return !inline && match ? (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  ) : (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-                a: ({ children, ...props }) => (
-                  <a
-                    {...props}
-                    className="text-gray-400 no-underline hover:text-gray-600 hover:underline hover:underline-offset-4 transition-colors duration-200 break-words"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {children}
-                  </a>
-                ),
-                blockquote: ({ children }) => (
-                  <div className="pl-4 border-l-4 border-gray-200 text-gray-400">
-                    {children}
-                  </div>
-                ),
-                img: (props) => {
-                  const transformedSrc = transformGithubImageUrl(props.src);
-                  return (
-                    <img
-                      {...props}
-                      src={transformedSrc}
-                      alt={props.alt || "image"}
-                    />
-                  );
-                },
-              }}
-            >
-              {aboutPage.content}
-            </ReactMarkdown>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    aboutPage = await getPublicAboutPage(username);
   } catch (error) {
+    if (isPublicProfileNotFound(error)) notFound();
     console.error("Error fetching public about page:", error);
+    throw error;
+  }
+
+  if (!aboutPage) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Card>
@@ -156,11 +72,24 @@ export default async function PublicAboutPage({
           </CardHeader>
           <CardContent>
             <p className="text-gray-500">
-              Error loading about page. The user may not have a TinyMind Blog.
+              {username} hasn&apos;t written an about page yet.
             </p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>About {username}</CardTitle>
+        </CardHeader>
+        <CardContent className="prose max-w-none">
+          <ServerMarkdownRenderer content={aboutPage.content} />
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

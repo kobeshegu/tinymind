@@ -4,6 +4,7 @@ import { apiCache, BoundedCache, invalidateOwner } from './cache';
 import { withRetry } from './retry';
 import { usernameSchema, validatePath } from './validation';
 import type { AboutPage, BlogPost, Thought } from './contentTypes';
+import { ApiError } from './apiErrors';
 
 export type { AboutPage, BlogPost, Thought } from './contentTypes';
 
@@ -267,35 +268,31 @@ export async function getBlogPosts(accessToken: string): Promise<BlogPost[]> {
     });
 
     if (!Array.isArray(response.data)) {
-      return [];
+      throw new Error(`Unexpected response for ${owner}/${repo}/content/blog`);
     }
 
     const posts = await Promise.all(
       response.data
         .filter((file) => file.type === 'file' && file.name !== '.gitkeep' && file.name.endsWith('.md'))
         .map(async (file) => {
-          try {
-            const contentResponse = await octokit.repos.getContent({
-              owner,
-              repo,
-              path: `content/blog/${file.name}`,
-            });
+          const contentResponse = await octokit.repos.getContent({
+            owner,
+            repo,
+            path: `content/blog/${file.name}`,
+          });
 
-            if ('content' in contentResponse.data) {
-              const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
-
-              const id = file.name.replace(/\.md$/, '');
-              const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
-
-              return { id, title, content, date };
-            }
-          } catch {
-            // Silently skip files that fail to load
+          if (Array.isArray(contentResponse.data) || !('content' in contentResponse.data)) {
+            throw new Error(`Unexpected response for content/blog/${file.name}`);
           }
+
+          const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
+          const id = file.name.replace(/\.md$/, '');
+          const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
+          return { id, title, content, date };
         })
     );
 
-    return posts.filter((post): post is BlogPost => post !== undefined);
+    return posts;
   } catch (error) {
     // If the blog directory doesn't exist, return an empty array
     if (error instanceof Error && 'status' in error && error.status === 404) {
@@ -333,8 +330,11 @@ export async function getBlogPost(id: string, accessToken: string): Promise<Blog
     const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
 
     return { id, title, content, date };
-  } catch {
-    return null;
+  } catch (error) {
+    if (isGitHubError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -766,6 +766,17 @@ interface BlogTreeQuery {
   } | null;
 }
 
+interface GraphqlRequestError {
+  errors?: Array<{ type?: string; path?: Array<string | number> }>;
+}
+
+function isMissingRepositoryGraphqlError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  return (error as GraphqlRequestError).errors?.some(
+    (item) => item.type === 'NOT_FOUND' && item.path?.[0] === 'repository'
+  ) ?? false;
+}
+
 const BLOG_TREE_QUERY = `
   query($owner: String!, $repo: String!) {
     repository(owner: $owner, name: $repo) {
@@ -793,6 +804,8 @@ const BLOG_TREE_QUERY = `
  */
 export async function getBlogPostsPublicFast(octokit: Octokit, owner: string, repo: string): Promise<BlogPost[]> {
   const cacheKey = `blog-posts-fast:${owner}:${repo}`;
+  // Read stale data before get(): get() intentionally evicts expired entries.
+  const staleData = apiCache.getStale<BlogPost[]>(cacheKey);
 
   const cachedData = apiCache.get<BlogPost[]>(cacheKey);
   if (cachedData) {
@@ -809,32 +822,52 @@ export async function getBlogPostsPublicFast(octokit: Octokit, owner: string, re
     }
     entries = data.repository.object.entries;
   } catch (error) {
+    if (isMissingRepositoryGraphqlError(error)) {
+      throw ApiError.notFound('TinyMind profile not found');
+    }
     // Never fall back to the per-file REST path on a rate-limit error: doing so
     // issues N+1 more requests at exactly the moment the budget is exhausted.
     if (isGitHubError(error) && (error.status === 403 || error.status === 429)) {
+      if (staleData) return staleData;
       throw error;
     }
     console.error(`GraphQL blog fetch failed for ${owner}/${repo}, falling back to REST:`, error);
-    return getBlogPostsPublic(octokit, owner, repo);
+    try {
+      return await getBlogPostsPublic(octokit, owner, repo);
+    } catch (fallbackError) {
+      if (staleData) return staleData;
+      throw fallbackError;
+    }
   }
 
   const now = new Date().toISOString();
-  const posts = (entries ?? [])
-    .filter((entry) => entry.type === 'blob' && entry.name.endsWith('.md') && entry.name !== '.gitkeep')
-    .map((entry) => {
-      const content = entry.object?.text;
-      // isTruncated means the blob exceeded what GraphQL will inline; the post
-      // needs the REST blob API, so skip it rather than store a partial body.
-      if (typeof content !== 'string' || entry.object?.isTruncated) {
-        console.error(`Skipping ${owner}/${repo} post ${entry.name}: content unavailable or truncated`);
-        return null;
-      }
-      const id = entry.name.replace(/\.md$/, '');
-      const { title, date } = parseFrontmatter(content, id, now);
-      return { id, title, content, date };
-    })
-    .filter((post): post is BlogPost => post !== null)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  let posts: BlogPost[];
+  try {
+    posts = (await Promise.all(
+      (entries ?? [])
+        .filter((entry) => entry.type === 'blob' && entry.name.endsWith('.md') && entry.name !== '.gitkeep')
+        .map(async (entry) => {
+          let content = entry.object?.text;
+          if (typeof content !== 'string' || entry.object?.isTruncated) {
+            const response = await octokit.repos.getContent({
+              owner,
+              repo,
+              path: `content/blog/${entry.name}`,
+            });
+            if (Array.isArray(response.data) || !('content' in response.data)) {
+              throw new Error(`Unexpected response for content/blog/${entry.name}`);
+            }
+            content = Buffer.from(response.data.content, 'base64').toString('utf-8');
+          }
+          const id = entry.name.replace(/\.md$/, '');
+          const { title, date } = parseFrontmatter(content, id, now);
+          return { id, title, content, date };
+        })
+    )).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch (error) {
+    if (staleData) return staleData;
+    throw error;
+  }
 
   apiCache.set(cacheKey, posts, 5 * 60 * 1000);
   return posts;
@@ -842,6 +875,8 @@ export async function getBlogPostsPublicFast(octokit: Octokit, owner: string, re
 
 export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: string): Promise<BlogPost[]> {
   const cacheKey = `blog-posts:${owner}:${repo}`;
+  // Preserve stale data before get() evicts an expired entry.
+  const staleData = apiCache.getStale<BlogPost[]>(cacheKey);
   
   // Check cache first
   const cachedData = apiCache.get<BlogPost[]>(cacheKey);
@@ -857,55 +892,48 @@ export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: 
     });
 
     if (!Array.isArray(response.data)) {
-      return [];
+      throw new Error(`Unexpected response for ${owner}/${repo}/content/blog`);
     }
 
     const mdFiles = response.data.filter((file) => file.type === 'file' && file.name.endsWith('.md'));
     
     // **PERFORMANCE OPTIMIZATION**: Fetch all files in parallel instead of sequentially
     const fetchPromises = mdFiles.map(async (file) => {
-      try {
-        const contentResponse = await octokit.repos.getContent({
-          owner,
-          repo,
-          path: `content/blog/${file.name}`,
-        });
+      const contentResponse = await octokit.repos.getContent({
+        owner,
+        repo,
+        path: `content/blog/${file.name}`,
+      });
 
-        if ('content' in contentResponse.data) {
-          const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
-          const id = file.name.replace(/\.md$/, '');
-          const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
-
-          return { id, title, content, date };
-        }
-        return null;
-      } catch (error) {
-        console.error(`Failed to load blog post ${file.name}:`, error);
-        return null;
+      if (Array.isArray(contentResponse.data) || !('content' in contentResponse.data)) {
+        throw new Error(`Unexpected response for content/blog/${file.name}`);
       }
+      const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
+      const id = file.name.replace(/\.md$/, '');
+      const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
+
+      return { id, title, content, date };
     });
 
     // Wait for all promises to resolve
     const posts = (await Promise.all(fetchPromises))
-      .filter((post): post is BlogPost => post !== null)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date desc
 
     // Cache the successful result
     apiCache.set(cacheKey, posts, 5 * 60 * 1000); // 5 minutes
     return posts;
   } catch (error: unknown) {
-    // Try to return stale cached data as fallback
-    const staleData = apiCache.getStale<BlogPost[]>(cacheKey);
     if (staleData) {
       return staleData;
     }
 
-    // Re-throw rate limiting errors so they can be handled by the UI
-    if (isGitHubError(error) && error.status === 403) {
-      throw error;
+    // A missing blog directory is a valid empty blog. Other failures are
+    // transient or malformed responses and must never be cached as emptiness.
+    if (isGitHubError(error) && error.status === 404) {
+      apiCache.set(cacheKey, [], 5 * 60 * 1000);
+      return [];
     }
-
-    return [];
+    throw error;
   }
 }
 

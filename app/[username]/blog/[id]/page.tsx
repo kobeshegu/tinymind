@@ -1,22 +1,8 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BlogPostContent } from "@/components/BlogPostContent";
-import { getPublicBlogPosts } from "@/lib/publicData";
-
-function decodeContent(content: string): string {
-  try {
-    return decodeURIComponent(content);
-  } catch (error) {
-    console.error("Error decoding content:", error);
-    // Return the original content if decoding fails
-    return content;
-  }
-}
-
-function removeFrontmatter(content: string): string {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-  return content.replace(frontmatterRegex, "");
-}
+import { PublicBlogPostContent } from "@/components/PublicBlogPostContent";
+import { getPublicBlogPosts, isPublicProfileNotFound } from "@/lib/publicData";
+import { decodeRouteSegment, stripFrontmatter } from "@/lib/content";
 
 export default async function PublicBlogPost({
   params,
@@ -25,17 +11,17 @@ export default async function PublicBlogPost({
 }) {
   const { username, id } = await params;
   const posts = await getPublicBlogPosts(username);
-  const post = posts.find((p) => p.id === decodeContent(id));
+  const post = posts.find((p) => p.id === decodeRouteSegment(id));
 
   if (!post) {
     notFound();
   }
 
   return (
-    <BlogPostContent
+    <PublicBlogPostContent
       title={post.title}
       date={post.date}
-      content={removeFrontmatter(decodeContent(post.content))}
+      content={stripFrontmatter(post.content)}
     />
   );
 }
@@ -49,16 +35,16 @@ export async function generateMetadata({
 
   try {
     const posts = await getPublicBlogPosts(username);
-    const post = posts.find((p) => p.id === decodeContent(id));
+    const post = posts.find((p) => p.id === decodeRouteSegment(id));
 
     if (!post) {
       return {
         title: "Blog Post Not Found",
+        robots: { index: false, follow: false },
       };
     }
 
-    const decodedContent = decodeContent(post.content);
-    const contentWithoutFrontmatter = removeFrontmatter(decodedContent);
+    const contentWithoutFrontmatter = stripFrontmatter(post.content);
 
     const description =
       contentWithoutFrontmatter
@@ -110,9 +96,16 @@ export async function generateMetadata({
       },
     };
   } catch (error) {
+    if (isPublicProfileNotFound(error)) {
+      return {
+        title: "Blog Post Not Found",
+        robots: { index: false, follow: false },
+      };
+    }
     console.error("Error generating metadata:", error);
     return {
-      title: "Error Loading Blog Post",
+      title: "Blog Post Temporarily Unavailable",
+      robots: { index: false, follow: false },
     };
   }
 }

@@ -19,21 +19,7 @@ import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import type { BlogPost } from "@/lib/contentTypes";
 import GitHubSignInButton from "@/components/GitHubSignInButton";
-
-function decodeContent(content: string): string {
-  try {
-    return decodeURIComponent(content);
-  } catch (error) {
-    console.error("Error decoding content:", error);
-    // Return the original content if decoding fails
-    return content;
-  }
-}
-
-function removeFrontmatter(content: string): string {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-  return content.replace(frontmatterRegex, "");
-}
+import { stripFrontmatter } from "@/lib/content";
 
 export default function BlogPostClient({ id }: { id: string }) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -41,19 +27,22 @@ export default function BlogPostClient({ id }: { id: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const [post, setPost] = useState<BlogPost | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const { data: session, status } = useSession();
   const t = useTranslations("HomePage");
 
   useEffect(() => {
     const fetchPost = async () => {
       if (!session || !session.accessToken) {
-        return <GitHubSignInButton />;
+        return;
       }
 
       try {
         // Use the encoded ID directly from the params
         // Decode the ID before sending it to the API
-        const response = await fetch(`/api/github?action=getBlogPost&id=${id}`);
+        const response = await fetch(
+          `/api/github?action=getBlogPost&id=${encodeURIComponent(id)}`
+        );
         if (!response.ok) {
           throw new Error("Failed to fetch blog post");
         }
@@ -61,6 +50,7 @@ export default function BlogPostClient({ id }: { id: string }) {
         setPost(fetchedPost);
       } catch (error) {
         console.error("Error fetching blog post:", error);
+        setLoadError(true);
         toast({
           title: t("error"),
           description: "Failed to fetch blog post",
@@ -117,6 +107,23 @@ export default function BlogPostClient({ id }: { id: string }) {
     }
   };
 
+  if (status === "unauthenticated") {
+    return <GitHubSignInButton />;
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 className="mb-3 text-2xl font-bold">Blog post unavailable</h1>
+        <p className="mb-6 text-gray-600">
+          The post could not be loaded. It may have been removed, or GitHub may
+          be temporarily unavailable.
+        </p>
+        <Button onClick={() => router.push("/blog")}>Back to blog</Button>
+      </div>
+    );
+  }
+
   if (status === "loading" || !post) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -125,8 +132,7 @@ export default function BlogPostClient({ id }: { id: string }) {
     );
   }
 
-  const decodedContent = decodeContent(post.content);
-  const contentWithoutFrontmatter = removeFrontmatter(decodedContent);
+  const contentWithoutFrontmatter = stripFrontmatter(post.content);
 
   const headerContent = (
     <div className="flex items-center gap-2">

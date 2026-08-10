@@ -4,6 +4,8 @@ import Negotiator from 'negotiator';
 import { getIconUrlsForUsername } from '@/lib/githubApi';
 import { usernameSchema } from '@/lib/validation';
 import { BoundedCache } from '@/lib/cache';
+import { assertPublicProfile } from '@/lib/publicData';
+import { createErrorResponse } from '@/lib/apiErrors';
 import ar from '@/messages/ar.json';
 import de from '@/messages/de.json';
 import en from '@/messages/en.json';
@@ -108,8 +110,10 @@ export async function GET(
       });
     }
 
-  const lang = getLocale(request);
-  const translations = await loadTranslations(lang) as { HomePage?: { blogTitle?: string; blogShortTitle?: string; blogDescription?: string } };
+    await assertPublicProfile(username);
+
+    const lang = getLocale(request);
+    const translations = await loadTranslations(lang) as { HomePage?: { blogTitle?: string; blogShortTitle?: string; blogDescription?: string } };
     
     let iconPath = '/icon.jpg'; // default fallback
     
@@ -120,55 +124,34 @@ export async function GET(
       // Continue with default icon
     }
 
-  const manifest = {
-    name: `${username}${translations.HomePage?.blogTitle || "'s TinyMind Blog"}`,
-    short_name: `${username}${translations.HomePage?.blogShortTitle || "'s Blog"}`,
-    description: `${translations.HomePage?.blogDescription || "Write and sync blog in Markdown with data stored in GitHub."}`,
-    start_url: `/${username}`,
-    display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#000000',
-    icons: [
-      {
-        src: iconPath,
-        sizes: '192x192',
-        type: 'image/png'
-      }
-    ]
-  };
-
-  return new NextResponse(JSON.stringify(manifest), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/manifest+json',
-        'Cache-Control': 'public, max-age=3600, s-maxage=3600', // Cache for 1 hour
-      },
-    });
-  } catch {
-    // Return a minimal valid manifest even on error
-    const fallbackManifest = {
-      name: 'TinyMind Blog',
-      short_name: 'TinyMind',
-      description: 'Write and sync blog in Markdown with data stored in GitHub.',
-      start_url: '/',
+    const manifest = {
+      name: `${username}${translations.HomePage?.blogTitle || "'s TinyMind Blog"}`,
+      short_name: `${username}${translations.HomePage?.blogShortTitle || "'s Blog"}`,
+      description: `${translations.HomePage?.blogDescription || "Write and sync blog in Markdown with data stored in GitHub."}`,
+      start_url: `/${username}`,
       display: 'standalone',
       background_color: '#ffffff',
       theme_color: '#000000',
       icons: [
         {
-          src: '/icon.jpg',
+          src: iconPath,
           sizes: '192x192',
           type: 'image/png'
         }
       ]
     };
 
-    return new NextResponse(JSON.stringify(fallbackManifest), {
-      status: 200, // Return 200 instead of 500 to avoid SEO issues
+    return new NextResponse(JSON.stringify(manifest), {
+      status: 200,
       headers: {
         'Content-Type': 'application/manifest+json',
-        'Cache-Control': 'public, max-age=300, s-maxage=300', // Shorter cache for fallback
-    },
-  });
+        'Cache-Control': 'public, max-age=3600, s-maxage=3600', // Cache for 1 hour
+      },
+    });
+  } catch (error) {
+    return createErrorResponse(error, {
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json',
+    });
   }
 }

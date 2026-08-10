@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublicBlogPosts } from '@/lib/publicData';
+import { getPublicBlogPosts, isPublicProfileNotFound } from '@/lib/publicData';
 import { usernameSchema } from '@/lib/validation';
+import { createErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(
   request: NextRequest,
@@ -16,19 +17,9 @@ export async function GET(
     const blogPosts = await getPublicBlogPosts(username);
     return NextResponse.json(blogPosts);
   } catch (error: unknown) {
-    console.error('Error in public-blog API:', error);
-    
-    // Handle rate limiting
-    if (error && typeof error === 'object' && 'status' in error && error.status === 403) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', message: 'Too many requests to GitHub API' },
-        { status: 429 }
-      );
+    if (!isPublicProfileNotFound(error)) {
+      console.error('Error in public-blog API:', error);
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to fetch blog posts' },
-      { status: 500 }
-    );
+    return createErrorResponse(error);
   }
 }

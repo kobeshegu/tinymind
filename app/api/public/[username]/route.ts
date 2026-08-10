@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublicProfileData } from '@/lib/publicData';
+import { getPublicProfileData, isPublicProfileNotFound } from '@/lib/publicData';
 import { usernameSchema } from '@/lib/validation';
+import { createErrorResponse } from '@/lib/apiErrors';
 
 // No force-dynamic: it overrode `revalidate` and the s-maxage header below,
 // so the route re-rendered on every request while claiming to be cacheable.
@@ -33,25 +34,15 @@ export async function GET(
       }
     );
   } catch (error) {
-    console.error('Error fetching public data:', error);
-    
-    // Handle rate limiting specifically
-    if (error && typeof error === 'object' && 'status' in error && error.status === 403) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', message: 'GitHub API rate limit exceeded. Please try again later.' },
-        { 
-          headers,
-          status: 429 
-        }
-      );
+    const profileNotFound = isPublicProfileNotFound(error);
+    if (!profileNotFound) {
+      console.error('Error fetching public data:', error);
     }
-
-    return NextResponse.json(
-      { error: 'Failed to fetch public data' },
-      { 
-        headers,
-        status: 500 
-      }
-    );
+    return createErrorResponse(error, {
+      'Cache-Control': profileNotFound
+        ? 'public, s-maxage=60, stale-while-revalidate=60'
+        : 'no-store',
+      'Content-Type': 'application/json',
+    });
   }
 }

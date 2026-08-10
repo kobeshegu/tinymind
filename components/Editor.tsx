@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useDropzone } from "react-dropzone";
 import { Tooltip } from "react-tooltip";
 import { GrInfo } from "react-icons/gr";
+import { stripFrontmatter } from "@/lib/content";
 
 const MarkdownRenderer = dynamic(
   () =>
@@ -29,11 +30,6 @@ const MarkdownRenderer = dynamic(
     loading: () => <div className="text-sm text-gray-400">Loading preview...</div>,
   }
 );
-
-function removeFrontmatter(content: string): string {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-  return content.replace(frontmatterRegex, "");
-}
 
 async function uploadImageFile(file: File): Promise<string> {
   const formData = new FormData();
@@ -91,6 +87,7 @@ export default function Editor({
         const thought = thoughts.find((t) => t.id === id);
         if (thought) {
           setContent(thought.content);
+          setEditingThoughtId(id);
         }
       } catch (error) {
         console.error("Error fetching thought:", error);
@@ -103,13 +100,15 @@ export default function Editor({
     async (id: string) => {
       if (!session?.accessToken) return;
       try {
-        const response = await fetch(`/api/github?action=getBlogPost&id=${id}`);
+        const response = await fetch(
+          `/api/github?action=getBlogPost&id=${encodeURIComponent(id)}`
+        );
         if (!response.ok) {
           throw new Error("Failed to fetch blog post");
         }
         const blogPost = await response.json();
         setTitle(blogPost.title);
-        setContent(removeFrontmatter(blogPost.content));
+        setContent(stripFrontmatter(blogPost.content));
         setEditingThoughtId(id);
       } catch (error) {
         console.error("Error fetching blog post:", error);
@@ -145,7 +144,6 @@ export default function Editor({
     const id = searchParams.get("id");
 
     if (id) {
-      setEditingThoughtId(id);
       if (type === "blog") {
         fetchBlogPost(id);
       } else if (type === "thought") {

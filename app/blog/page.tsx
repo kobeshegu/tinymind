@@ -13,15 +13,22 @@ export default async function BlogPage() {
     return <GitHubSignInButton />;
   }
 
+  let posts;
+  let loadError: unknown;
   try {
-    const posts = await getBlogPosts(session.accessToken);
-    return <BlogList posts={posts} />;
+    posts = await getBlogPosts(session.accessToken);
   } catch (error) {
     console.error("Error fetching blog posts:", error);
+    loadError = error;
+  }
+
+  if (loadError) {
     return (
       <div className="error-message">
-        An error occurred while fetching blog posts: {(error as Error).message}
+        Blog posts are temporarily unavailable. Please try again shortly.
       </div>
     );
   }
+
+  return <BlogList posts={posts ?? []} />;
 }

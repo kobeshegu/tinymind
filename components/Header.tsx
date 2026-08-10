@@ -10,6 +10,25 @@ import ChromeIcon from "@/components/icons/ChromeIcon";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
+const APP_ROUTES = new Set([
+  "_next",
+  "api",
+  "about",
+  "blog",
+  "editor",
+  "login",
+  "thoughts",
+  "unavailable",
+]);
+
+function publicUsernameFromPath(pathname: string): string | undefined {
+  const firstSegment = pathname.split("/")[1];
+  if (!firstSegment || APP_ROUTES.has(firstSegment)) return undefined;
+  return /^(?!-)[a-zA-Z0-9-]{1,39}(?<!-)$/.test(firstSegment)
+    ? firstSegment
+    : undefined;
+}
+
 export default function Header({
   username: propUsername,
 }: {
@@ -18,25 +37,29 @@ export default function Header({
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const t = useTranslations("HomePage");
+  const publicUsername = useMemo(
+    () => propUsername ?? publicUsernameFromPath(pathname),
+    [pathname, propUsername]
+  );
 
   // The login arrives with the session, so this resolves on first render
   // rather than after a round-trip to /api/github.
   const avatarUrl = useMemo(() => {
-    const owner = propUsername ?? session?.user?.username;
+    const owner = publicUsername ?? session?.user?.username;
     return owner ? `https://github.com/${owner}.png` : "/icon.jpg";
-  }, [propUsername, session?.user?.username]);
+  }, [publicUsername, session?.user?.username]);
 
   const isLoggedIn = !!session?.user && status === "authenticated";
-  const isOnPublicProfilePage = !!propUsername;
+  const isOnPublicProfilePage = !!publicUsername;
 
   // Memoize active tab calculation
   const activeTab = useMemo(() => {
     if (isOnPublicProfilePage) {
-      if (pathname === `/${propUsername}/thoughts`) return "thoughts";
-      if (pathname === `/${propUsername}/about`) return "about";
+      if (pathname === `/${publicUsername}/thoughts`) return "thoughts";
+      if (pathname === `/${publicUsername}/about`) return "about";
       if (
-        pathname === `/${propUsername}` ||
-        pathname === `/${propUsername}/blog`
+        pathname === `/${publicUsername}` ||
+        pathname.startsWith(`/${publicUsername}/blog`)
       )
         return "blog";
       return "blog";
@@ -46,15 +69,15 @@ export default function Header({
       if (pathname === "/" || pathname === "/thoughts") return "thoughts";
       return "thoughts";
     }
-  }, [isOnPublicProfilePage, pathname, propUsername]);
+  }, [isOnPublicProfilePage, pathname, publicUsername]);
 
   // Memoize navigation URLs
   const navUrls = useMemo(() => {
     if (isOnPublicProfilePage) {
       return {
-        blog: `/${propUsername}/blog`,
-        thoughts: `/${propUsername}/thoughts`,
-        about: `/${propUsername}/about`,
+        blog: `/${publicUsername}/blog`,
+        thoughts: `/${publicUsername}/thoughts`,
+        about: `/${publicUsername}/about`,
       };
     } else {
       return {
@@ -63,7 +86,7 @@ export default function Header({
         about: "/about",
       };
     }
-  }, [isOnPublicProfilePage, propUsername]);
+  }, [isOnPublicProfilePage, publicUsername]);
 
   const shouldShowTabs = isLoggedIn || isOnPublicProfilePage;
 
@@ -72,7 +95,7 @@ export default function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <Link
-            href={isOnPublicProfilePage ? `/${propUsername}` : "/"}
+            href={isOnPublicProfilePage ? `/${publicUsername}` : "/"}
             className=""
           >
             <Image
@@ -81,47 +104,41 @@ export default function Header({
               width={32}
               height={32}
               className="rounded-full"
+              unoptimized={avatarUrl.startsWith("https://github.com/")}
             />
           </Link>
           {shouldShowTabs && (
             <div className="flex-grow flex justify-center">
               <div className="flex space-x-2 sm:space-x-4 w-full justify-center">
-                <Link
-                  href={navUrls.blog}
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={`text-lg font-normal border-0 transition-colors duration-150 ${
+                    activeTab === "blog" ? "text-black" : "text-gray-300"
+                  }`}
                 >
-                  <Button
-                    variant="ghost"
-                    className={`text-lg font-normal border-0 transition-colors duration-150 ${
-                      activeTab === "blog" ? "text-black" : "text-gray-300"
-                    }`}
-                  >
-                    {t("blog")}
-                  </Button>
-                </Link>
-                <Link
-                  href={navUrls.thoughts}
+                  <Link href={navUrls.blog}>{t("blog")}</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={`text-lg font-normal border-0 transition-colors duration-150 ${
+                    activeTab === "thoughts" ? "text-black" : "text-gray-300"
+                  }`}
                 >
-                  <Button
-                    variant="ghost"
-                    className={`text-lg font-normal border-0 transition-colors duration-150 ${
-                      activeTab === "thoughts" ? "text-black" : "text-gray-300"
-                    }`}
-                  >
-                    {t("thoughts")}
-                  </Button>
-                </Link>
-                <Link
-                  href={navUrls.about}
+                  <Link href={navUrls.thoughts}>{t("thoughts")}</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={`text-lg font-normal border-0 transition-colors duration-150 ${
+                    activeTab === "about" ? "text-black" : "text-gray-300"
+                  }`}
                 >
-                  <Button
-                    variant="ghost"
-                    className={`text-lg font-normal border-0 transition-colors duration-150 ${
-                      activeTab === "about" ? "text-black" : "text-gray-300"
-                    }`}
-                  >
+                  <Link href={navUrls.about}>
                     {t("about")}
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           )}
@@ -140,6 +157,8 @@ export default function Header({
               target="_blank"
               rel="noopener noreferrer"
               className="text-black hover:text-gray-500"
+              aria-label="TinyMind on GitHub"
+              title="TinyMind on GitHub"
             >
               <FaGithub size={24} />
             </Link>

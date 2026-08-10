@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import PublicThoughtsList from "@/components/PublicThoughtsList";
-import { getPublicThoughts } from "@/lib/publicData";
+import { getPublicThoughts, isPublicProfileNotFound } from "@/lib/publicData";
+import { notFound } from "next/navigation";
 
 // Add this to disable static page generation
 export const revalidate = 60;
@@ -53,26 +54,18 @@ export default async function PublicThoughtsPage({
 }) {
   const { username } = await params;
 
+  let thoughts;
   try {
-    const thoughts = await getPublicThoughts(username);
-
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <PublicThoughtsList thoughts={thoughts} />
-      </div>
-    );
+    thoughts = await getPublicThoughts(username);
   } catch (error) {
+    if (isPublicProfileNotFound(error)) notFound();
     console.error("Error fetching public thoughts:", error);
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error Loading Thoughts</h1>
-          <p className="text-gray-600">
-            Error loading thoughts. The user may not have a TinyMind Blog or the
-            repository may be private.
-          </p>
-        </div>
-      </div>
-    );
+    throw error;
   }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <PublicThoughtsList thoughts={thoughts} />
+    </div>
+  );
 }

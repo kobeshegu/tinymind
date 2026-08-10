@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { FiPlus } from "react-icons/fi";
 import { AbstractIntlMessages } from "next-intl";
+import { useSession } from "next-auth/react";
 
 export default function CreateButton({
   messages,
@@ -11,14 +12,24 @@ export default function CreateButton({
   messages: AbstractIntlMessages;
 }) {
   const pathname = usePathname();
+  const { status } = useSession();
 
   const isThoughtsPage = pathname === "/" || pathname === "/thoughts";
   const isBlogPage = pathname === "/blog";
   const createLink = isBlogPage ? "/editor?type=blog" : "/editor?type=thought";
 
+  if (status !== "authenticated" || (!isThoughtsPage && !isBlogPage)) {
+    return null;
+  }
+
   return (
     <Link
       href={createLink}
+      aria-label={
+        isThoughtsPage
+          ? (messages.createNewThought as string)
+          : (messages.createNewBlogPost as string)
+      }
       className="fixed bottom-9 right-9 p-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-lg z-20 flex items-center justify-center"
     >
       <FiPlus className="w-6 h-6" />

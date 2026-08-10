@@ -3,10 +3,8 @@
 import React, { memo, Suspense, lazy } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  containsMath,
-  markdownComponents,
-} from "@/components/shared/markdownComponents";
+import { markdownComponents } from "@/components/shared/markdownComponents";
+import { containsMath } from "@/lib/markdown";
 
 const MathMarkdown = lazy(() => import("@/components/shared/MathMarkdown"));
 

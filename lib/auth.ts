@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next"
 import { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { Session } from "next-auth"
+import { getUserLogin } from "./githubApi"
 
 declare module "next-auth" {
   interface Session {
@@ -43,12 +44,30 @@ export const authOptions: NextAuthOptions = {
       if (profile) {
         token.username = (profile as { login?: string }).login
       }
+      // JWT sessions created before username was persisted otherwise remain
+      // incomplete until they expire. Resolve the login once and store it back
+      // into the encrypted JWT so existing users do not need to sign in again.
+      const lastUsernameLookup = typeof token.usernameLookupAt === "number"
+        ? token.usernameLookupAt
+        : 0
+      if (
+        !token.username &&
+        typeof token.accessToken === "string" &&
+        Date.now() - lastUsernameLookup > 5 * 60 * 1000
+      ) {
+        token.usernameLookupAt = Date.now()
+        try {
+          token.username = await getUserLogin(token.accessToken)
+        } catch (error) {
+          console.error("Failed to restore GitHub username in session:", error)
+        }
+      }
       return token
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken as string
-      if (session.user) {
-        session.user.username = token.username as string
+      if (session.user && typeof token.username === "string") {
+        session.user.username = token.username
       }
       return session
     }

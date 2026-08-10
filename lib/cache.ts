@@ -24,7 +24,7 @@ function extractUserFromKey(key: string): string | null {
  * Track a cache key for a specific user
  */
 function trackKeyForUser(key: string): void {
-  const user = extractUserFromKey(key);
+  const user = extractUserFromKey(key)?.toLowerCase();
   if (user) {
     if (!keysByUser.has(user)) {
       keysByUser.set(user, new Set());
@@ -37,7 +37,7 @@ function trackKeyForUser(key: string): void {
  * Remove key from user tracking
  */
 function untrackKey(key: string): void {
-  const user = extractUserFromKey(key);
+  const user = extractUserFromKey(key)?.toLowerCase();
   if (user && keysByUser.has(user)) {
     keysByUser.get(user)!.delete(key);
     if (keysByUser.get(user)!.size === 0) {
@@ -154,12 +154,13 @@ class MemoryCache {
 
   // Invalidate all cache entries for a specific user
   invalidateUser(username: string): void {
-    const userKeys = keysByUser.get(username);
+    const normalizedUsername = username.toLowerCase();
+    const userKeys = keysByUser.get(normalizedUsername);
     if (userKeys) {
       userKeys.forEach(key => {
         this.cache.delete(key);
       });
-      keysByUser.delete(username);
+      keysByUser.delete(normalizedUsername);
     }
   }
 
