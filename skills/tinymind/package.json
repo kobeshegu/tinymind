@@ -1,15 +1,42 @@
 {
   "name": "tinymind-cli",
   "version": "0.1.0",
-  "private": true,
   "description": "Publish thoughts and articles to TinyMind from the command line",
   "type": "module",
   "bin": {
+    "tinymind-cli": "scripts/tinymind.mjs",
     "tinymind": "scripts/tinymind.mjs",
     "tm": "scripts/tinymind.mjs"
   },
+  "files": [
+    "SKILL.md",
+    "agents/",
+    "scripts/tinymind.mjs"
+  ],
   "scripts": {
-    "test": "node --test scripts/tinymind.node-test.mjs"
+    "test": "node --test scripts/tinymind.node-test.mjs",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "tinymind",
+    "markdown",
+    "blog",
+    "github",
+    "cli"
+  ],
+  "author": "mazzystar",
+  "license": "MIT",
+  "homepage": "https://tinymind.me",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mazzzystar/tinymind.git",
+    "directory": "skills/tinymind"
+  },
+  "bugs": {
+    "url": "https://github.com/mazzzystar/tinymind/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"

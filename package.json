@@ -11,7 +11,7 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "install:cli": "npm install --global ./skills/tinymind",
+    "install:cli:dev": "npm install --global ./skills/tinymind",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run && npm --prefix skills/tinymind test",

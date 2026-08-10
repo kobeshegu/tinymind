@@ -37,24 +37,40 @@ Features:
 
 ### Command Line
 
-Publish from a local terminal with the bundled TinyMind skill and CLI. It uses your existing GitHub CLI authentication and syncs each successful command to GitHub immediately.
+Publish from any local terminal without cloning, running, or deploying the
+TinyMind website. The CLI uses your existing GitHub CLI authentication and
+commits each successful command directly to your own `tinymind-blog`
+repository.
 
 ```bash
-npm run install:cli
+npm install --global tinymind-cli
+gh auth login
 
 tm "A quick thought"
 tinymind -t "Article title" -c "Article body"
 tm -t "Long article" -f /path/to/article.md
 ```
 
-Both `tinymind` and the shorter `tm` run the same CLI. Set `TINYMIND_REPO=owner/repo` to override the default `<authenticated-user>/tinymind-blog` repository.
+For a one-off command without a global installation:
 
-To make the bundled skill available to Codex while developing it, link it into
-the local skills directory and start a new Codex task:
+```bash
+npx --yes tinymind-cli "A quick thought"
+```
+
+`tinymind-cli`, `tinymind`, and the shorter `tm` run the same CLI. Set
+`TINYMIND_REPO=owner/repo` to override the default
+`<authenticated-user>/tinymind-blog` repository.
+
+### AI Agent Skill (Optional)
+
+The npm package also contains a TinyMind skill for AI agents. Regular terminal
+users do not need it. To make it available to Codex, link the installed package
+into the local skills directory and start a new Codex task:
 
 ```bash
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-ln -s "$PWD/skills/tinymind" "${CODEX_HOME:-$HOME/.codex}/skills/tinymind"
+ln -s "$(npm root --global)/tinymind-cli" \
+  "${CODEX_HOME:-$HOME/.codex}/skills/tinymind"
 ```
 
 ## How It Works

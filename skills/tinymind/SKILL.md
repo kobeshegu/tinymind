@@ -51,12 +51,13 @@ node scripts/tinymind.mjs -t "Title" -f /path/to/post.md
 
 Use `--dry-run` to validate and preview without contacting GitHub. Use `--json` when machine-readable output is useful.
 
-## Install the local commands
+## Install the commands
 
-From this skill directory, run:
+Install the public package when the commands are unavailable:
 
 ```bash
-npm install --global .
+npm install --global tinymind-cli
 ```
 
-This installs both `tinymind` and its short alias `tm`.
+This installs `tinymind-cli`, `tinymind`, and the short alias `tm`. A TinyMind
+source checkout or local web deployment is not required.
