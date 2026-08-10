@@ -85,7 +85,8 @@ npx opennextjs-cloudflare deploy
 ```
 
 For a manual deployment, use `npm run deploy`. Runtime secrets are managed in
-Cloudflare and must not be committed to the repository.
+Cloudflare and must not be committed to the repository. OpenNext's incremental
+cache is persisted in the `tinymind-opennext-cache` R2 bucket.
 
 ## Contribute
 
