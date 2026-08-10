@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { match } from '@formatjs/intl-localematcher';
 import Negotiator from 'negotiator';
 import { getIconUrlsForUsername } from '@/lib/githubApi';
+import { usernameSchema } from '@/lib/validation';
 import { BoundedCache } from '@/lib/cache';
 import ar from '@/messages/ar.json';
 import de from '@/messages/de.json';
@@ -95,10 +96,12 @@ export async function GET(
   try {
     const { username } = await params;
     
-    // Validate username
-    if (!username || typeof username !== 'string' || username.trim() === '') {
+    // Only a well-formed GitHub username may reach getIconUrlsForUsername: the
+    // emptiness check this replaces let arbitrary path segments through to an
+    // authenticated GitHub call.
+    if (!usernameSchema.safeParse(username).success) {
       return new NextResponse(JSON.stringify({ error: 'Invalid username' }), {
-        status: 400,
+        status: 404,
         headers: {
           'Content-Type': 'application/json',
         },

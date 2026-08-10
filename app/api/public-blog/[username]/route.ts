@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPublicBlogPosts } from '@/lib/publicData';
+import { usernameSchema } from '@/lib/validation';
 
 export async function GET(
   request: NextRequest,
@@ -7,13 +8,15 @@ export async function GET(
 ) {
   const { username } = await params;
 
+  if (!usernameSchema.safeParse(username).success) {
+    return NextResponse.json({ error: 'Invalid username' }, { status: 404 });
+  }
+
   try {
     const blogPosts = await getPublicBlogPosts(username);
     return NextResponse.json(blogPosts);
   } catch (error: unknown) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error in public-blog API:', error);
-    }
+    console.error('Error in public-blog API:', error);
     
     // Handle rate limiting
     if (error && typeof error === 'object' && 'status' in error && error.status === 403) {

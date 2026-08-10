@@ -1,6 +1,8 @@
 import Header from "@/components/Header";
 import { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getIconUrlsForUsername } from "@/lib/githubApi";
+import { usernameSchema } from "@/lib/validation";
 
 export async function generateMetadata({
   params,
@@ -8,6 +10,9 @@ export async function generateMetadata({
   params: Promise<{ username: string }>;
 }): Promise<Metadata> {
   const { username } = await params;
+  if (!usernameSchema.safeParse(username).success) {
+    return { title: "Not Found", robots: { index: false, follow: false } };
+  }
   const { iconPath } = await getIconUrlsForUsername(username);
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
   const canonicalUrl = `${baseUrl}/${username}`;
@@ -69,6 +74,14 @@ export default async function UserLayout({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
+
+  // Rejecting the malformed ones here covers every /[username]/* page at once.
+  // Without it, any string reached GitHub — so an anonymous loop over random
+  // names both burned the shared token's rate limit and minted unbounded
+  // indexable pages with attacker-chosen titles.
+  if (!usernameSchema.safeParse(username).success) {
+    notFound();
+  }
 
   return (
     <>

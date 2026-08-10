@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPublicProfileData } from '@/lib/publicData';
+import { usernameSchema } from '@/lib/validation';
 
-export const dynamic = 'force-dynamic'; // Disable caching for this route
-export const revalidate = 300; // Revalidate every 5 minutes
+// No force-dynamic: it overrode `revalidate` and the s-maxage header below,
+// so the route re-rendered on every request while claiming to be cacheable.
+export const revalidate = 300;
 
 export async function GET(
   request: NextRequest,
@@ -15,6 +17,10 @@ export async function GET(
   };
 
   const { username } = await params;
+
+  if (!usernameSchema.safeParse(username).success) {
+    return NextResponse.json({ error: 'Invalid username' }, { status: 404, headers });
+  }
 
   try {
     const { blogPosts, thoughts, aboutPage } = await getPublicProfileData(username);

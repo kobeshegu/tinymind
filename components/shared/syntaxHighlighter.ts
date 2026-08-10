@@ -61,6 +61,7 @@ const LANGUAGES: Record<string, unknown> = {
   elixir,
   go,
   graphql,
+  haskell,
   ini,
   java,
   javascript,

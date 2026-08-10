@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Octokit } from "@octokit/rest";
-import { BoundedCache } from "./cache";
+import { BoundedCache, registerInvalidatableCache } from "./cache";
 import {
   getAboutPagePublic,
   getBlogPostsPublicFast,
@@ -13,6 +13,11 @@ const PUBLIC_REPO = "tinymind-blog";
 const blogCache = new BoundedCache<BlogPost[]>(100, 5 * 60 * 1000);
 const thoughtsCache = new BoundedCache<Thought[]>(100, 5 * 60 * 1000);
 const aboutCache = new BoundedCache<AboutPage | null>(100, 5 * 60 * 1000);
+
+// So invalidateOwner() reaches these after a write.
+registerInvalidatableCache(blogCache);
+registerInvalidatableCache(thoughtsCache);
+registerInvalidatableCache(aboutCache);
 
 function createPublicOctokit() {
   const githubToken = process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN;

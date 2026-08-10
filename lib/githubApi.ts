@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import path from 'path';
-import { apiCache, BoundedCache } from './cache';
+import { apiCache, BoundedCache, invalidateOwner } from './cache';
 import { withRetry } from './retry';
 import { usernameSchema, validatePath } from './validation';
 import type { AboutPage, BlogPost, Thought } from './contentTypes';
@@ -11,7 +11,6 @@ export type { AboutPage, BlogPost, Thought } from './contentTypes';
 type UpdateFileParams = Parameters<Octokit['repos']['createOrUpdateFileContents']>[0];
 
 // Check if we're in development mode
-const isDev = process.env.NODE_ENV === 'development';
 
 // Cache for default branch names to reduce API calls
 const branchCache = new BoundedCache<string>(100, 10 * 60 * 1000); // 10 min TTL
@@ -122,10 +121,10 @@ async function getRepoInfo(accessToken: string | undefined) {
       repo: 'tinymind-blog', // You might want to make this configurable
     };
   } catch (error) {
-    // Only log in development to avoid leaking sensitive info in production
-    if (isDev) {
-      console.error('Error getting authenticated user:', error);
-    }
+    // Worker logs are not user-visible, and @octokit/request-error already
+    // redacts the authorization header. Gating this on isDev meant production
+    // emitted no diagnostics at all.
+    console.error('Error getting authenticated user:', error);
     throw new Error('Failed to get authenticated user');
   }
 }
@@ -382,6 +381,7 @@ export async function createBlogPost(
     content: Buffer.from(fullContent).toString('base64'),
   });
 
+  invalidateOwner(owner);
   return { newId };
 }
 
@@ -444,6 +444,8 @@ export async function createThought(content: string, image: string | undefined, 
 
     await octokit.repos.createOrUpdateFileContents(updateParams);
   }, { maxAttempts: 3 });
+
+  invalidateOwner(owner);
 }
 
 export async function deleteThought(id: string, accessToken: string): Promise<void> {
@@ -495,6 +497,8 @@ export async function deleteThought(id: string, accessToken: string): Promise<vo
 
     await octokit.repos.createOrUpdateFileContents(updateParams);
   }, { maxAttempts: 3 });
+
+  invalidateOwner(owner);
 }
 
 export async function getUserLogin(accessToken: string): Promise<string> {
@@ -552,6 +556,8 @@ export async function updateThought(id: string, content: string, accessToken: st
 
     await octokit.repos.createOrUpdateFileContents(updateParams);
   }, { maxAttempts: 3 });
+
+  invalidateOwner(owner);
 }
 
 export async function deleteBlogPost(id: string, accessToken: string): Promise<void> {
@@ -585,6 +591,8 @@ export async function deleteBlogPost(id: string, accessToken: string): Promise<v
     message: 'Delete blog post',
     sha: currentFile.data.sha,
   });
+
+  invalidateOwner(owner);
 }
 
 export async function updateBlogPost(
@@ -604,7 +612,7 @@ export async function updateBlogPost(
   const { owner, repo } = await getRepoInfo(accessToken);
 
   // Use retry logic to handle race conditions
-  return await withRetry(async () => {
+  const result = await withRetry(async () => {
     // Get the current file to retrieve its SHA and content
     const currentFile = await octokit.repos.getContent({
       owner,
@@ -670,6 +678,9 @@ export async function updateBlogPost(
       return {};
     }
   }, { maxAttempts: 3 });
+
+  invalidateOwner(owner);
+  return result;
 }
 
 export async function uploadImage(
@@ -869,9 +880,7 @@ export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: 
         }
         return null;
       } catch (error) {
-        if (isDev) {
-          console.warn(`Failed to load blog post ${file.name}:`, error);
-        }
+        console.error(`Failed to load blog post ${file.name}:`, error);
         return null;
       }
     });
@@ -901,6 +910,7 @@ export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: 
 }
 
 export async function getThoughtsPublic(octokit: Octokit, owner: string, repo: string): Promise<Thought[]> {
+  let raw: string;
   try {
     const response = await octokit.repos.getContent({
       owner,
@@ -912,9 +922,24 @@ export async function getThoughtsPublic(octokit: Octokit, owner: string, repo: s
       return [];
     }
 
-    const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
-    return JSON.parse(content) as Thought[];
-  } catch {
+    raw = Buffer.from(response.data.content, 'base64').toString('utf-8');
+  } catch (error) {
+    // Only a missing file means "this user has no thoughts". An unconditional
+    // catch turned rate limits and 5xx into the same empty array, which callers
+    // then cached for five minutes — so one GitHub hiccup could serve a crawler
+    // a 200 with an empty profile.
+    if (isGitHubError(error) && error.status === 404) {
+      return [];
+    }
+    console.error(`Failed to read thoughts for ${owner}/${repo}:`, error);
+    throw error;
+  }
+
+  try {
+    return JSON.parse(raw) as Thought[];
+  } catch (error) {
+    // The file exists but is unusable. Not transient, so don't throw on it.
+    console.error(`content/thoughts.json in ${owner}/${repo} is not valid JSON:`, error);
     return [];
   }
 }
@@ -1039,6 +1064,8 @@ export async function createAboutPage(content: string, accessToken: string): Pro
     message: 'Create about page',
     content: Buffer.from(content).toString('base64'),
   });
+
+  invalidateOwner(owner);
 }
 
 export async function updateAboutPage(content: string, accessToken: string): Promise<void> {
@@ -1068,6 +1095,8 @@ export async function updateAboutPage(content: string, accessToken: string): Pro
     content: Buffer.from(content).toString('base64'),
     sha: currentFile.data.sha,
   });
+
+  invalidateOwner(owner);
 }
 
 export async function getAboutPagePublic(octokit: Octokit, owner: string, repo: string): Promise<AboutPage | null> {
@@ -1087,7 +1116,11 @@ export async function getAboutPagePublic(octokit: Octokit, owner: string, repo: 
     return {
       content,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (isGitHubError(error) && error.status === 404) {
+      return null;
+    }
+    console.error(`Failed to read the about page for ${owner}/${repo}:`, error);
+    throw error;
   }
 }

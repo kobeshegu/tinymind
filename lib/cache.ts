@@ -246,6 +246,18 @@ export class BoundedCache<T> {
     this.cache.clear();
   }
 
+  /** Drop every entry whose key is scoped to this owner ("type:owner:repo"). */
+  invalidateOwner(owner: string): number {
+    let removed = 0;
+    for (const key of Array.from(this.cache.keys())) {
+      if (extractUserFromKey(key)?.toLowerCase() === owner.toLowerCase()) {
+        this.cache.delete(key);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   get size(): number {
     return this.cache.size;
   }
@@ -253,6 +265,29 @@ export class BoundedCache<T> {
 
 // Global cache instance with max size limit
 export const apiCache = new MemoryCache(1000);
+
+/**
+ * Caches that invalidateOwner() should sweep.
+ *
+ * The public read caches live in lib/publicData.ts, which imports githubApi and
+ * therefore cannot be imported back from it. Registering them here keeps write
+ * paths from having to know where every cache lives — which is why the previous
+ * invalidateUserCache had zero callers and content stayed stale for minutes
+ * after publishing.
+ */
+const registeredCaches: Array<BoundedCache<unknown>> = [];
+
+export function registerInvalidatableCache<T>(cache: BoundedCache<T>): void {
+  registeredCaches.push(cache as unknown as BoundedCache<unknown>);
+}
+
+/** Call after any write, so the author's next read reflects it. */
+export function invalidateOwner(owner: string): void {
+  apiCache.invalidateUser(owner);
+  for (const cache of registeredCaches) {
+    cache.invalidateOwner(owner);
+  }
+}
 
 // Track cleanup interval for proper cleanup (prevents HMR issues)
 let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
