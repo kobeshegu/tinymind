@@ -71,6 +71,18 @@ function unquoteYamlScalar(value: string): string {
   }
 }
 
+/**
+ * Render a post's frontmatter block.
+ *
+ * The title goes through JSON.stringify because interpolating it raw produced
+ * YAML that either broke or lied: "C++: The Good Parts" is invalid YAML, a
+ * leading '#' reads as a comment, and an embedded newline could inject a second
+ * date: key that the reader would then prefer. JSON strings are valid YAML.
+ */
+function serializeFrontmatter(title: string, date: string): string {
+  return `---\ntitle: ${JSON.stringify(title)}\ndate: ${date}\n---\n`;
+}
+
 function toIsoDate(raw: string | undefined, fallback: string): string {
   if (!raw) {
     return fallback;
@@ -273,20 +285,10 @@ export async function getBlogPosts(accessToken: string): Promise<BlogPost[]> {
             if ('content' in contentResponse.data) {
               const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
 
-              // Parse the date from the content
-              const dateMatch = content.match(/date:\s*(.+)/);
-              const date = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+              const id = file.name.replace(/\.md$/, '');
+              const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
 
-              // Parse the title from the content (plain text, no URL decoding needed)
-              const titleMatch = content.match(/title:\s*(.+)/);
-              const title = titleMatch ? titleMatch[1].trim() : file.name.replace('.md', '');
-
-              return {
-                id: file.name.replace('.md', ''),
-                title,
-                content,
-                date,
-              };
+              return { id, title, content, date };
             }
           } catch {
             // Silently skip files that fail to load
@@ -329,20 +331,9 @@ export async function getBlogPost(id: string, accessToken: string): Promise<Blog
 
     const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
 
-    // Parse the title from the content (plain text, no URL decoding needed)
-    const titleMatch = content.match(/title:\s*(.+)/);
-    const title = titleMatch ? titleMatch[1].trim() : id;
+    const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
 
-    // Parse the date from the content
-    const dateMatch = content.match(/date:\s*(.+)/);
-    const date = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
-
-    return {
-      id,
-      title,
-      content,
-      date,
-    };
+    return { id, title, content, date };
   } catch {
     return null;
   }
@@ -381,12 +372,7 @@ export async function createBlogPost(
   const newId = generateSafeId(title);
   const path = `content/blog/${newId}.md`;
   const date = new Date().toISOString(); // Store full ISO string
-  const fullContent = `---
-title: ${title}
-date: ${date}
----
-
-${content}`;
+  const fullContent = `${serializeFrontmatter(title, date)}\n${content}`;
 
   await octokit.repos.createOrUpdateFileContents({
     owner,
@@ -636,20 +622,17 @@ export async function updateBlogPost(
 
     const existingContent = Buffer.from(currentFile.data.content, 'base64').toString('utf-8');
 
-    // Extract the original date from the existing content
-    const dateMatch = existingContent.match(/date:\s*(.+)/);
-    const date = dateMatch ? dateMatch[1] : new Date().toISOString();
+    // Carry over the original publication date, normalized. The old code wrote
+    // the raw captured string straight back, so editing a post whose body
+    // contained an unparseable "date:" line persisted that value and made the
+    // post vanish from every listing.
+    const { title: originalTitle, date } = parseFrontmatter(
+      existingContent,
+      safeId,
+      new Date().toISOString()
+    );
 
-    // Extract the original title from the existing content
-    const titleMatch = existingContent.match(/title:\s*(.+)/);
-    const originalTitle = titleMatch ? titleMatch[1] : safeId;
-
-    const updatedContent = `---
-title: ${title}
-date: ${date}
----
-
-${content}`;
+    const updatedContent = `${serializeFrontmatter(title, date)}\n${content}`;
 
     // Check if the title has changed
     const newId = generateSafeId(title);
@@ -879,15 +862,10 @@ export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: 
 
         if ('content' in contentResponse.data) {
           const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
-          const titleMatch = content.match(/title:\s*(.+)/);
-          const dateMatch = content.match(/date:\s*(.+)/);
+          const id = file.name.replace(/\.md$/, '');
+          const { title, date } = parseFrontmatter(content, id, new Date().toISOString());
 
-          return {
-            id: file.name.replace('.md', ''),
-            title: titleMatch ? titleMatch[1].trim() : file.name.replace('.md', ''),
-            content,
-            date: dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
-          };
+          return { id, title, content, date };
         }
         return null;
       } catch (error) {
@@ -1111,96 +1089,5 @@ export async function getAboutPagePublic(octokit: Octokit, owner: string, repo: 
     };
   } catch {
     return null;
-  }
-}
-
-export async function getBlogPostsPublicLight(octokit: Octokit, owner: string, repo: string): Promise<BlogPost[]> {
-  const cacheKey = `blog-posts-light:${owner}:${repo}`;
-  
-  // Check cache first
-  const cachedData = apiCache.get<BlogPost[]>(cacheKey);
-  if (cachedData) {
-    return cachedData;
-  }
-
-  try {
-    const response = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: 'content/blog',
-    });
-
-    if (!Array.isArray(response.data)) {
-      return [];
-    }
-
-    const mdFiles = response.data.filter((file) => file.type === 'file' && file.name.endsWith('.md'));
-    const posts: BlogPost[] = [];
-
-    // Only fetch first few files to get some content, rest just metadata
-    const MAX_FULL_CONTENT = 10; // Only fetch full content for first 10 posts
-    
-    for (let i = 0; i < mdFiles.length; i++) {
-      const file = mdFiles[i];
-      
-      try {
-        // Add small delay between requests
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        if (i < MAX_FULL_CONTENT) {
-          // Fetch full content for first few posts
-          const contentResponse = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: `content/blog/${file.name}`,
-          });
-
-          if ('content' in contentResponse.data) {
-            const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8');
-            const titleMatch = content.match(/title:\s*(.+)/);
-            const dateMatch = content.match(/date:\s*(.+)/);
-
-            posts.push({
-              id: file.name.replace('.md', ''),
-              title: titleMatch ? titleMatch[1].trim() : file.name.replace('.md', ''),
-              content,
-              date: dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
-            });
-          }
-        } else {
-          // For remaining posts, just create basic metadata
-          posts.push({
-            id: file.name.replace('.md', ''),
-            title: file.name.replace('.md', '').replace(/-/g, ' '),
-            content: '', // Empty content for list view
-            date: new Date().toISOString(), // Default date
-          });
-        }
-      } catch (error: unknown) {
-        // If we hit rate limit, stop and return what we have
-        if (isGitHubError(error) && error.status === 403) {
-          break;
-        }
-      }
-    }
-
-    // Cache the result
-    apiCache.set(cacheKey, posts, 10 * 60 * 1000); // 10 minutes for light data
-    return posts;
-  } catch (error: unknown) {
-    // Try to return stale cached data as fallback
-    const staleData = apiCache.getStale<BlogPost[]>(cacheKey);
-    if (staleData) {
-      return staleData;
-    }
-
-    // Re-throw rate limiting errors
-    if (isGitHubError(error) && error.status === 403) {
-      throw error;
-    }
-
-    return [];
   }
 }

@@ -18,7 +18,10 @@ export const blogPostSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
     .max(200, 'Title must be 200 characters or less')
-    .trim(),
+    .trim()
+    // .trim() only strips the ends, so interior newlines used to pass through
+    // into the YAML frontmatter and could inject a second date: key.
+    .regex(/^[^\r\n]+$/, 'Title cannot contain line breaks'),
   content: z.string()
     .min(1, 'Content is required')
     .max(100000, 'Content must be 100,000 characters or less'),
