@@ -8,57 +8,23 @@ import { usePathname } from "next/navigation";
 import { FaGithub } from "react-icons/fa";
 import ChromeIcon from "@/components/icons/ChromeIcon";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, useMemo } from "react";
-
-async function fetchCurrentUsername(): Promise<string | null> {
-  const response = await fetch("/api/github?action=getUserLogin");
-  if (!response.ok) {
-    return null;
-  }
-  const data = (await response.json()) as { username?: string };
-  return data.username ?? null;
-}
+import { useMemo } from "react";
 
 export default function Header({
   username: propUsername,
-  iconUrl,
 }: {
   username?: string;
-  iconUrl?: string;
 }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const t = useTranslations("HomePage");
-  const [avatarUrl, setAvatarUrl] = useState<string>("/icon.jpg");
 
-  useEffect(() => {
-    let cancelled = false;
-
-    if (propUsername) {
-      setAvatarUrl(`https://github.com/${propUsername}.png`);
-      return;
-    }
-
-    if (!session?.accessToken) {
-      setAvatarUrl("/icon.jpg");
-      return;
-    }
-
-    fetchCurrentUsername().then((login) => {
-      if (cancelled) return;
-      setAvatarUrl(login ? `https://github.com/${login}.png` : "/icon.jpg");
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session, propUsername]);
-
-  useEffect(() => {
-    if (iconUrl && iconUrl !== "/icon.jpg") {
-      setAvatarUrl(iconUrl);
-    }
-  }, [iconUrl]);
+  // The login arrives with the session, so this resolves on first render
+  // rather than after a round-trip to /api/github.
+  const avatarUrl = useMemo(() => {
+    const owner = propUsername ?? session?.user?.username;
+    return owner ? `https://github.com/${owner}.png` : "/icon.jpg";
+  }, [propUsername, session?.user?.username]);
 
   const isLoggedIn = !!session?.user && status === "authenticated";
   const isOnPublicProfilePage = !!propUsername;

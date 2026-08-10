@@ -31,12 +31,15 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, profile }) {
       if (account && account.access_token) {
         token.accessToken = account.access_token
       }
-      if (account) {
-        token.username = account.username
+      // The GitHub login lives on `profile`, not `account`. Reading it from
+      // `account` yielded undefined, which is why the header and footer each
+      // had to fetch it over the network on every page load.
+      if (profile) {
+        token.username = (profile as { login?: string }).login
       }
       return token
     },

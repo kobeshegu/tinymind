@@ -69,11 +69,10 @@ export default async function UserLayout({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const { iconPath } = await getIconUrlsForUsername(username);
 
   return (
     <>
-      <Header username={username} iconUrl={iconPath} />
+      <Header username={username} />
       <div className="pt-20 max-w-4xl mx-auto px-4 py-8">{children}</div>
     </>
   );
