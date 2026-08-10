@@ -33,7 +33,6 @@ export default function ThoughtsList() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [thoughtToDelete, setThoughtToDelete] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expandedThoughts, setExpandedThoughts] = useState<
     Record<string, boolean>
   >({});
@@ -145,7 +144,6 @@ export default function ThoughtsList() {
       });
     } finally {
       setThoughtToDelete(null);
-      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -181,6 +179,33 @@ export default function ThoughtsList() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
+      {/* One dialog for the whole list. Rendering it inside the map mounted one
+          per thought, all bound to the same boolean, so clicking delete on any
+          thought opened every overlay at once. */}
+      <Dialog open={thoughtToDelete !== null} onOpenChange={(open) => !open && setThoughtToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("confirmDelete")}</DialogTitle>
+            <DialogDescription>{t("undoAction")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">{t("cancel")}</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (thoughtToDelete) {
+                  handleDeleteThought(thoughtToDelete);
+                }
+                setThoughtToDelete(null);
+              }}
+            >
+              {t("delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="space-y-4">
         {thoughts.map((thought) => (
           <div
@@ -199,10 +224,7 @@ export default function ThoughtsList() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setThoughtToDelete(thought.id);
-                      setIsDeleteDialogOpen(true);
-                    }}
+                    onSelect={() => setThoughtToDelete(thought.id)}
                   >
                     {t("delete")}
                   </DropdownMenuItem>
@@ -215,33 +237,6 @@ export default function ThoughtsList() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Dialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
-              >
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{t("confirmDelete")}</DialogTitle>
-                    <DialogDescription>{t("undoAction")}</DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="outline">{t("cancel")}</Button>
-                    </DialogClose>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        if (thoughtToDelete) {
-                          handleDeleteThought(thoughtToDelete);
-                        }
-                        setIsDeleteDialogOpen(false);
-                      }}
-                    >
-                      {t("delete")}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
               <MarkdownRenderer content={getDisplayContent(thought)} />
 
               {isLongThought(thought.content) && (

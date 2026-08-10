@@ -25,7 +25,9 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET!,
       authorization: {
         params: {
-          scope: 'public_repo workflow'
+          // No Actions API is called anywhere; `workflow` only granted a stolen
+          // token the ability to push .github/workflows/* to the user's repos.
+          scope: 'public_repo'
         }
       }
     }),
