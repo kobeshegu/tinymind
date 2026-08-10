@@ -10,7 +10,7 @@ import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { Toaster } from "@/components/ui/toaster";
 import Head from "next/head";
 import CreateButton from "@/components/CreateButton";
-import { getIconUrls } from "@/lib/githubApi";
+import { getIconUrlsForToken } from "@/lib/githubApi";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
@@ -117,7 +117,7 @@ async function getIconPaths(accessToken: string | undefined) {
 
   if (accessToken) {
     try {
-      const iconUrls = await getIconUrls(accessToken);
+      const iconUrls = await getIconUrlsForToken(accessToken);
       // Ensure that the returned paths are not empty or problematic before using them
       return {
         iconPath: iconUrls.iconPath || defaultIconPath,
@@ -125,8 +125,8 @@ async function getIconPaths(accessToken: string | undefined) {
           iconUrls.appleTouchIconPath || defaultAppleTouchIconPath,
       };
     } catch (error) {
-      console.error("Error in getIconPaths while calling getIconUrls:", error);
-      // Fallback to truly generic defaults if getIconUrls itself throws an unhandled error
+      console.error("Error in getIconPaths while calling getIconUrlsForToken:", error);
+      // Fallback to truly generic defaults if the lookup itself throws an unhandled error
     }
   }
 

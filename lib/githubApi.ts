@@ -2,7 +2,7 @@ import { Octokit } from '@octokit/rest';
 import path from 'path';
 import { apiCache, BoundedCache } from './cache';
 import { withRetry } from './retry';
-import { validatePath } from './validation';
+import { usernameSchema, validatePath } from './validation';
 import type { AboutPage, BlogPost, Thought } from './contentTypes';
 
 export type { AboutPage, BlogPost, Thought } from './contentTypes';
@@ -881,74 +881,62 @@ export async function getThoughtsPublic(octokit: Octokit, owner: string, repo: s
   }
 }
 
-export async function getIconUrls(usernameOrAccessToken: string): Promise<{ iconPath: string; appleTouchIconPath: string }> {
-  let owner: string | null = null; // Initialize owner as null
-  let repo: string = 'tinymind-blog'; // Default repo name
-  let octokit: Octokit | null = null;
+export interface IconUrls {
+  iconPath: string;
+  appleTouchIconPath: string;
+}
 
-  const genericDefaultIconPath = "/icon.jpg"; // Truly generic icon
-  const genericDefaultAppleTouchIconPath = "/icon-144.jpg"; // Truly generic apple touch icon
+const GENERIC_ICON_URLS: IconUrls = {
+  iconPath: '/icon.jpg',
+  appleTouchIconPath: '/icon-144.jpg',
+};
 
-  // Validate input
-  if (!usernameOrAccessToken || typeof usernameOrAccessToken !== 'string' || usernameOrAccessToken.trim() === '') {
-    return { 
-      iconPath: genericDefaultIconPath, 
-      appleTouchIconPath: genericDefaultAppleTouchIconPath 
-    };
+/**
+ * Icons for a public profile, resolved from the GitHub avatar.
+ *
+ * Only ever pass a username. This value ends up in page metadata and in an
+ * <img src>, so usernameSchema is what keeps a credential — which is never a
+ * valid GitHub username — from being rendered into the page.
+ */
+export async function getIconUrlsForUsername(username: string): Promise<IconUrls> {
+  if (!usernameSchema.safeParse(username).success) {
+    return GENERIC_ICON_URLS;
   }
 
-  // Check if the input is likely an access token or a username
-  if (usernameOrAccessToken.length > 40 && usernameOrAccessToken.startsWith("gh")) { // More specific check for PATs
-    try {
-      octokit = getOctokit(usernameOrAccessToken);
-      const repoInfo = await getRepoInfo(usernameOrAccessToken); // This uses the token to get actual user login
-      owner = repoInfo.owner; // Correct owner (username)
-      repo = repoInfo.repo;
-    } catch {
-      // If fetching user info with token fails, return generic defaults
-      return {
-        iconPath: genericDefaultIconPath,
-        appleTouchIconPath: genericDefaultAppleTouchIconPath
-      };
-    }
-  } else {
-    // Validate username format (basic check)
-    if (!/^[a-zA-Z0-9_-]+$/.test(usernameOrAccessToken)) {
-      return {
-        iconPath: genericDefaultIconPath,
-        appleTouchIconPath: genericDefaultAppleTouchIconPath
-      };
-    }
-    owner = usernameOrAccessToken; // Assumed to be a username
+  const avatar = `https://github.com/${username}.png`;
+  return { iconPath: avatar, appleTouchIconPath: avatar };
+}
+
+/**
+ * Icons for the signed-in user, preferring the custom icons committed to their
+ * repo and falling back to their GitHub avatar.
+ */
+export async function getIconUrlsForToken(accessToken: string): Promise<IconUrls> {
+  if (!accessToken) {
+    return GENERIC_ICON_URLS;
   }
 
-  let iconPathToUse: string;
-  let appleTouchIconPathToUse: string;
-
-  if (owner) {
-    // If we have an owner (either from token or direct username), construct potential GitHub avatar URL
-    iconPathToUse = `https://github.com/${owner}.png`;
-    appleTouchIconPathToUse = `https://github.com/${owner}.png`; // Often the same for GitHub avatars
-
-    if (octokit) { // If octokit was initialized (meaning a token was likely provided and valid for repo access)
-      try {
-        // Get default branch once for both icon lookups (uses cache)
-        const defaultBranch = await getDefaultBranch(octokit, owner, repo);
-
-        // Try to fetch custom icons from the repo, fall back to the GitHub avatar if not found
-        iconPathToUse = await getIconUrl(octokit, owner, repo, defaultBranch, 'assets/icon.jpg', iconPathToUse);
-        appleTouchIconPathToUse = await getIconUrl(octokit, owner, repo, defaultBranch, 'assets/icon-144.jpg', appleTouchIconPathToUse);
-      } catch {
-        // Keep using GitHub avatar URLs as fallback
-      }
-    }
-  } else {
-    // If owner is still null, use generic defaults
-    iconPathToUse = genericDefaultIconPath;
-    appleTouchIconPathToUse = genericDefaultAppleTouchIconPath;
+  let octokit: Octokit;
+  let owner: string;
+  let repo: string;
+  try {
+    octokit = getOctokit(accessToken);
+    ({ owner, repo } = await getRepoInfo(accessToken));
+  } catch {
+    return GENERIC_ICON_URLS;
   }
 
-  return { iconPath: iconPathToUse, appleTouchIconPath: appleTouchIconPathToUse };
+  const avatar = `https://github.com/${owner}.png`;
+  try {
+    const defaultBranch = await getDefaultBranch(octokit, owner, repo);
+    const [iconPath, appleTouchIconPath] = await Promise.all([
+      getIconUrl(octokit, owner, repo, defaultBranch, 'assets/icon.jpg', avatar),
+      getIconUrl(octokit, owner, repo, defaultBranch, 'assets/icon-144.jpg', avatar),
+    ]);
+    return { iconPath, appleTouchIconPath };
+  } catch {
+    return { iconPath: avatar, appleTouchIconPath: avatar };
+  }
 }
 
 async function getIconUrl(octokit: Octokit, owner: string, repo: string, branch: string, iconPath: string, defaultPath: string): Promise<string> {

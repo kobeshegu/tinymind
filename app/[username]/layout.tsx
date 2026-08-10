@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import { Metadata } from "next";
-import { getIconUrls } from "@/lib/githubApi";
+import { getIconUrlsForUsername } from "@/lib/githubApi";
 
 export async function generateMetadata({
   params,
@@ -8,7 +8,7 @@ export async function generateMetadata({
   params: Promise<{ username: string }>;
 }): Promise<Metadata> {
   const { username } = await params;
-  const { iconPath } = await getIconUrls(username);
+  const { iconPath } = await getIconUrlsForUsername(username);
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
   const canonicalUrl = `${baseUrl}/${username}`;
 
@@ -69,7 +69,7 @@ export default async function UserLayout({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const { iconPath } = await getIconUrls(username);
+  const { iconPath } = await getIconUrlsForUsername(username);
 
   return (
     <>

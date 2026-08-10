@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { match } from '@formatjs/intl-localematcher';
 import Negotiator from 'negotiator';
-import { getIconUrls } from '@/lib/githubApi';
+import { getIconUrlsForUsername } from '@/lib/githubApi';
 import { BoundedCache } from '@/lib/cache';
 import ar from '@/messages/ar.json';
 import de from '@/messages/de.json';
@@ -111,7 +111,7 @@ export async function GET(
     let iconPath = '/icon.jpg'; // default fallback
     
     try {
-      const { iconPath: userIconPath } = await getIconUrls(username);
+      const { iconPath: userIconPath } = await getIconUrlsForUsername(username);
       iconPath = userIconPath || '/icon.jpg';
     } catch {
       // Continue with default icon
