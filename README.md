@@ -35,6 +35,21 @@ Features:
 - Drag & drop or paste images
 - Supports 20 languages
 
+### Command Line
+
+Publish from a local terminal with the bundled TinyMind skill and CLI. It uses your existing GitHub CLI authentication and syncs each successful command to GitHub immediately.
+
+```bash
+cd skills/tinymind
+npm install --global .
+
+tm "A quick thought"
+tinymind -t "Article title" -c "Article body"
+tm -t "Long article" -f /path/to/article.md
+```
+
+Both `tinymind` and the shorter `tm` run the same CLI. Set `TINYMIND_REPO=owner/repo` to override the default `<authenticated-user>/tinymind-blog` repository.
+
 ## How It Works
 
 1. You authorize Tinymind to read/write your public GitHub repositories.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TinyMind"
+  short_description: "Publish thoughts and articles to TinyMind"
+  default_prompt: "Use $tinymind to publish this thought to my TinyMind."
