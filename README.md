@@ -71,6 +71,21 @@ Built with cutting-edge technologies:
 - TypeScript
 - NextAuth.js
 - Tailwind CSS
+- Cloudflare Workers via OpenNext
+
+## Deployment
+
+Production runs on the `tinymind` Cloudflare Worker. Pushes to `main` are built
+and deployed automatically by Cloudflare Workers Builds using the commands
+below:
+
+```bash
+npx opennextjs-cloudflare build
+npx opennextjs-cloudflare deploy
+```
+
+For a manual deployment, use `npm run deploy`. Runtime secrets are managed in
+Cloudflare and must not be committed to the repository.
 
 ## Contribute
 

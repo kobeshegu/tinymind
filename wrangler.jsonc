@@ -25,13 +25,5 @@
     "ALLOWED_ORIGIN": "https://tinymind.me",
     "NEXTAUTH_URL": "https://tinymind.me",
     "NEXT_PUBLIC_BASE_URL": "https://tinymind.me"
-  },
-  "secrets": {
-    "required": [
-      "GITHUB_ID",
-      "GITHUB_SECRET",
-      "NEXTAUTH_SECRET",
-      "GITHUB_TOKEN"
-    ]
   }
 }
