@@ -653,26 +653,20 @@ export async function uploadImage(
 
   const { owner, repo } = await getRepoInfo(accessToken);
 
-  // Get the default branch with caching
-  const defaultBranch = await getDefaultBranch(octokit, owner, repo);
-
   await initializeGitHubStructure(octokit, owner, repo);
 
   // Generate a unique filename
   const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   const id = Date.now().toString();
-  const ext = path.extname(file.name);
+  const ext = imageExtension(file);
   const filename = `${id}${ext}`;
   const filePath = `assets/images/${date}/${filename}`;
 
-  // Ensure the directory exists
-  await ensureDirectoryExists(octokit, owner, repo, `assets/images/${date}`);
-
-  // Convert file to base64
   const content = await fileToBase64(file);
 
-  // Upload the file
-  await octokit.repos.createOrUpdateFileContents({
+  // Git has no empty directories, so createOrUpdateFileContents creates the
+  // parent path itself — no need to pre-create the folder.
+  const { data } = await octokit.repos.createOrUpdateFileContents({
     owner,
     repo,
     path: filePath,
@@ -680,43 +674,43 @@ export async function uploadImage(
     content,
   });
 
-  // Construct the direct raw.githubusercontent.com URL
-  return `https://raw.githubusercontent.com/${owner}/${repo}/${defaultBranch}/${filePath}`;
+  // Pin the URL to the commit SHA: branch-based raw URLs are CDN-cached for
+  // minutes, which makes a freshly uploaded image render as broken.
+  const ref = data.commit?.sha ?? (await getDefaultBranch(octokit, owner, repo));
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${filePath}`;
 }
 
-async function ensureDirectoryExists(octokit: Octokit, owner: string, repo: string, path: string) {
-  try {
-    await octokit.repos.getContent({ owner, repo, path });
-  } catch (error) {
-    if (error instanceof Error && 'status' in error && error.status === 404) {
-      // Directory doesn't exist, create it
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: `${path}/.gitkeep`,
-        message: `Create directory: ${path}`,
-        content: '',
-      });
-    } else {
-      throw error;
-    }
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/svg+xml': '.svg',
+  'image/bmp': '.bmp',
+  'image/heic': '.heic',
+};
+
+/**
+ * Derive the extension from the MIME type rather than trusting file.name,
+ * which is client-supplied and ends up in a repository path.
+ */
+function imageExtension(file: File): string {
+  const fromMime = IMAGE_EXTENSIONS[file.type.toLowerCase()];
+  if (fromMime) {
+    return fromMime;
   }
+  const fromName = path.extname(file.name).toLowerCase();
+  return /^\.[a-z0-9]{1,8}$/.test(fromName) ? fromName : '.png';
 }
 
+/**
+ * Runs on the server (Node and the Cloudflare Workers runtime), where
+ * FileReader does not exist — read the bytes directly instead.
+ */
 async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        // Remove the data URL prefix (e.g., "data:image/png;base64,")
-        resolve(reader.result.split(',')[1]);
-      } else {
-        reject(new Error('Failed to convert file to base64'));
-      }
-    };
-    reader.onerror = (error) => reject(error);
-  });
+  const bytes = await file.arrayBuffer();
+  return Buffer.from(bytes).toString('base64');
 }
 
 // **ULTRA-FAST VERSION**: Uses GitHub Tree API to get all files in one call
