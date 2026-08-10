@@ -33,6 +33,53 @@ async function getDefaultBranch(octokit: Octokit, owner: string, repo: string): 
 }
 
 /**
+ * Read a post's title and date out of its YAML frontmatter.
+ *
+ * Anchored to the frontmatter block on purpose: an unanchored /date:\s*(.+)/
+ * matches the first such line anywhere in the file, so a body line like
+ * "date: TBD" was captured and fed to new Date(...).toISOString(), which throws
+ * RangeError. Callers wrap this in catch blocks that drop the post, so the
+ * post vanished from every listing with no error and no log.
+ */
+function parseFrontmatter(
+  content: string,
+  fallbackTitle: string,
+  fallbackDate: string
+): { title: string; date: string } {
+  const block = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const frontmatter = block ? block[1] : '';
+
+  const titleMatch = frontmatter.match(/^title:\s*(.+)$/m);
+  const dateMatch = frontmatter.match(/^date:\s*(.+)$/m);
+
+  return {
+    title: titleMatch ? unquoteYamlScalar(titleMatch[1].trim()) : fallbackTitle,
+    date: toIsoDate(dateMatch?.[1], fallbackDate),
+  };
+}
+
+/** Titles are written as JSON strings; older posts stored them raw. Accept both. */
+function unquoteYamlScalar(value: string): string {
+  if (!value.startsWith('"')) {
+    return value;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'string' ? parsed : value;
+  } catch {
+    return value;
+  }
+}
+
+function toIsoDate(raw: string | undefined, fallback: string): string {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Date.parse(raw.trim());
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
+}
+
+/**
  * Type guard to check if an error is a GitHub API error with status code
  */
 export function isGitHubError(error: unknown): error is { status: number; message?: string } {
@@ -713,77 +760,90 @@ async function fileToBase64(file: File): Promise<string> {
   return Buffer.from(bytes).toString('base64');
 }
 
-// **ULTRA-FAST VERSION**: Uses GitHub Tree API to get all files in one call
+interface BlogTreeQuery {
+  repository: {
+    object: {
+      entries?: Array<{
+        name: string;
+        type: string;
+        object: { text?: string; isTruncated?: boolean } | null;
+      }>;
+    } | null;
+  } | null;
+}
+
+const BLOG_TREE_QUERY = `
+  query($owner: String!, $repo: String!) {
+    repository(owner: $owner, name: $repo) {
+      object(expression: "HEAD:content/blog") {
+        ... on Tree {
+          entries {
+            name
+            type
+            object { ... on Blob { text isTruncated } }
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Fetch every published post in a single request.
+ *
+ * The REST equivalent was one getTree plus one getBlob per post, which for a
+ * 100-post blog meant 102 calls per page view and enough concurrency to trip
+ * GitHub's secondary rate limit. One GraphQL query costs 1 point of a separate
+ * 5000/hour budget and needs no default-branch lookup, since `HEAD:` resolves
+ * it server-side.
+ */
 export async function getBlogPostsPublicFast(octokit: Octokit, owner: string, repo: string): Promise<BlogPost[]> {
   const cacheKey = `blog-posts-fast:${owner}:${repo}`;
 
-  // Check cache first
   const cachedData = apiCache.get<BlogPost[]>(cacheKey);
   if (cachedData) {
     return cachedData;
   }
 
+  let entries: NonNullable<NonNullable<BlogTreeQuery['repository']>['object']>['entries'];
   try {
-    // Get the repo's default branch with caching
-    const defaultBranch = await getDefaultBranch(octokit, owner, repo);
-
-    // First get the tree to find all blog files in one API call
-    const treeResponse = await octokit.git.getTree({
-      owner,
-      repo,
-      tree_sha: defaultBranch,
-      recursive: 'true'
-    });
-
-    const blogFiles = treeResponse.data.tree.filter(
-      (item) => item.path?.startsWith('content/blog/') && item.path.endsWith('.md') && item.type === 'blob'
-    );
-
-    if (blogFiles.length === 0) {
+    const data = await octokit.graphql<BlogTreeQuery>(BLOG_TREE_QUERY, { owner, repo });
+    // A missing repository or a repository with no content/blog directory.
+    if (!data.repository?.object) {
+      apiCache.set(cacheKey, [], 5 * 60 * 1000);
       return [];
     }
-
-    // Get all file contents in parallel using blob API (faster than content API)
-    const fetchPromises = blogFiles.map(async (file) => {
-      try {
-        if (!file.sha || !file.path) return null;
-
-        const blobResponse = await octokit.git.getBlob({
-          owner,
-          repo,
-          file_sha: file.sha
-        });
-
-        const content = Buffer.from(blobResponse.data.content, 'base64').toString('utf-8');
-        const titleMatch = content.match(/title:\s*(.+)/);
-        const dateMatch = content.match(/date:\s*(.+)/);
-        const fileName = file.path.split('/').pop() || '';
-
-        return {
-          id: fileName.replace('.md', ''),
-          title: titleMatch ? titleMatch[1].trim() : fileName.replace('.md', ''),
-          content,
-          date: dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
-        };
-      } catch (error) {
-        if (isDev) {
-          console.warn(`Failed to load blog post ${file.path}:`, error);
-        }
-        return null;
-      }
-    });
-
-    const posts = (await Promise.all(fetchPromises))
-      .filter((post): post is BlogPost => post !== null)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    // Cache the result
-    apiCache.set(cacheKey, posts, 5 * 60 * 1000); // 5 minutes
-    return posts;
-  } catch {
-    // Fallback to regular method
+    entries = data.repository.object.entries;
+  } catch (error) {
+    // Never fall back to the per-file REST path on a rate-limit error: doing so
+    // issues N+1 more requests at exactly the moment the budget is exhausted.
+    if (isGitHubError(error) && (error.status === 403 || error.status === 429)) {
+      throw error;
+    }
+    console.error(`GraphQL blog fetch failed for ${owner}/${repo}, falling back to REST:`, error);
     return getBlogPostsPublic(octokit, owner, repo);
   }
+
+  const now = new Date().toISOString();
+  const posts = (entries ?? [])
+    .filter((entry) => entry.type === 'blob' && entry.name.endsWith('.md') && entry.name !== '.gitkeep')
+    .map((entry) => {
+      const content = entry.object?.text;
+      // isTruncated means the blob exceeded what GraphQL will inline; the post
+      // needs the REST blob API, so skip it rather than store a partial body.
+      if (typeof content !== 'string' || entry.object?.isTruncated) {
+        console.error(`Skipping ${owner}/${repo} post ${entry.name}: content unavailable or truncated`);
+        return null;
+      }
+      const id = entry.name.replace(/\.md$/, '');
+      const { title, date } = parseFrontmatter(content, id, now);
+      return { id, title, content, date };
+    })
+    .filter((post): post is BlogPost => post !== null)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  apiCache.set(cacheKey, posts, 5 * 60 * 1000);
+  return posts;
 }
 
 export async function getBlogPostsPublic(octokit: Octokit, owner: string, repo: string): Promise<BlogPost[]> {
