@@ -40,8 +40,7 @@ Features:
 Publish from a local terminal with the bundled TinyMind skill and CLI. It uses your existing GitHub CLI authentication and syncs each successful command to GitHub immediately.
 
 ```bash
-cd skills/tinymind
-npm install --global .
+npm run install:cli
 
 tm "A quick thought"
 tinymind -t "Article title" -c "Article body"
@@ -49,6 +48,14 @@ tm -t "Long article" -f /path/to/article.md
 ```
 
 Both `tinymind` and the shorter `tm` run the same CLI. Set `TINYMIND_REPO=owner/repo` to override the default `<authenticated-user>/tinymind-blog` repository.
+
+To make the bundled skill available to Codex while developing it, link it into
+the local skills directory and start a new Codex task:
+
+```bash
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+ln -s "$PWD/skills/tinymind" "${CODEX_HOME:-$HOME/.codex}/skills/tinymind"
+```
 
 ## How It Works
 
