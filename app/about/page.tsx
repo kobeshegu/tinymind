@@ -9,7 +9,7 @@ import GitHubSignInButton from "@/components/GitHubSignInButton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FiEdit } from "react-icons/fi";
 import { getTranslations } from "next-intl/server";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { SyntaxHighlighter } from "@/components/shared/syntaxHighlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
