@@ -1,82 +1,88 @@
 import { MetadataRoute } from 'next'
-import { getPublicBlogPosts } from '@/lib/publicData'
+import { Octokit } from '@octokit/rest'
+
+const BASE_URL = 'https://tinymind.me'
+const PUBLIC_REPO = 'tinymind-blog'
+
+/** Search returns at most 1000 results, so stop there rather than loop forever. */
+const MAX_PAGES = 10
+const PER_PAGE = 100
+
+interface DiscoveredUser {
+  login: string
+  updatedAt: string
+}
+
+/**
+ * Find the users who have a TinyMind blog.
+ *
+ * There is no user table — GitHub is the database — so the only way to
+ * enumerate authors is to ask GitHub which accounts have the repository. The
+ * previous version hardcoded a single username, which meant every other user's
+ * blog was absent from the sitemap entirely.
+ */
+async function discoverUsers(): Promise<DiscoveredUser[]> {
+  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN
+  const octokit = token ? new Octokit({ auth: token }) : new Octokit()
+  const users = new Map<string, DiscoveredUser>()
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const { data } = await octokit.search.repos({
+      q: `${PUBLIC_REPO} in:name`,
+      per_page: PER_PAGE,
+      page,
+    })
+
+    for (const repo of data.items) {
+      // `in:name` is a substring match, so require the exact repository name.
+      if (repo.name !== PUBLIC_REPO || repo.private || !repo.owner?.login) {
+        continue
+      }
+      const login = repo.owner.login
+      if (!users.has(login)) {
+        users.set(login, { login, updatedAt: repo.pushed_at || repo.updated_at })
+      }
+    }
+
+    if (data.items.length < PER_PAGE) {
+      break
+    }
+  }
+
+  return Array.from(users.values())
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://tinymind.me'
-  
-  // Static pages
   const staticPages: MetadataRoute.Sitemap = [
     {
-      url: baseUrl,
+      url: BASE_URL,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,
     },
   ]
 
-  // Get dynamic user pages
-  const dynamicPages: MetadataRoute.Sitemap = []
-  
+  let users: DiscoveredUser[] = []
   try {
-    // This is a simplified approach - in production you might want to maintain a list of active users
-    // For now, we'll include some known users or implement a discovery mechanism
-    const knownUsers = ['mazzzystar'] // You can expand this list or implement user discovery
-    
-    for (const username of knownUsers) {
-      try {
-        // Add user homepage
-        dynamicPages.push({
-          url: `${baseUrl}/${username}`,
-          lastModified: new Date(),
-          changeFrequency: 'weekly',
-          priority: 0.8,
-        })
-
-        // Add user blog page
-        dynamicPages.push({
-          url: `${baseUrl}/${username}/blog`,
-          lastModified: new Date(),
-          changeFrequency: 'weekly',
-          priority: 0.7,
-        })
-
-        // Add user thoughts page
-        dynamicPages.push({
-          url: `${baseUrl}/${username}/thoughts`,
-          lastModified: new Date(),
-          changeFrequency: 'weekly',
-          priority: 0.6,
-        })
-
-        // Add user about page
-        dynamicPages.push({
-          url: `${baseUrl}/${username}/about`,
-          lastModified: new Date(),
-          changeFrequency: 'monthly',
-          priority: 0.5,
-        })
-
-        try {
-          const blogPosts = await getPublicBlogPosts(username)
-          for (const post of blogPosts) {
-            dynamicPages.push({
-              url: `${baseUrl}/${username}/blog/${encodeURIComponent(post.id)}`,
-              lastModified: new Date(post.date),
-              changeFrequency: 'monthly',
-              priority: 0.6,
-            })
-          }
-        } catch (blogError) {
-          console.error(`Error fetching blog posts for ${username}:`, blogError)
-        }
-      } catch (error) {
-        console.error(`Error fetching data for user ${username}:`, error)
-        // Continue with other users even if one fails
-      }
-    }
+    users = await discoverUsers()
   } catch (error) {
-    console.error('Error generating dynamic sitemap entries:', error)
+    // A degraded sitemap beats a failed build or an empty response.
+    console.error('Sitemap: user discovery failed, emitting static pages only:', error)
+    return staticPages
   }
 
-  return [...staticPages, ...dynamicPages]
+  // Profile pages only. Listing every post would cost one content request per
+  // user, and crawlers reach the posts by following the blog index anyway.
+  const userPages: MetadataRoute.Sitemap = users.flatMap(({ login, updatedAt }) => {
+    const lastModified = new Date(updatedAt)
+    return [
+      { url: `${BASE_URL}/${login}`, lastModified, changeFrequency: 'weekly' as const, priority: 0.8 },
+      { url: `${BASE_URL}/${login}/blog`, lastModified, changeFrequency: 'weekly' as const, priority: 0.7 },
+      { url: `${BASE_URL}/${login}/thoughts`, lastModified, changeFrequency: 'weekly' as const, priority: 0.6 },
+      { url: `${BASE_URL}/${login}/about`, lastModified, changeFrequency: 'monthly' as const, priority: 0.5 },
+    ]
+  })
+
+  console.log(`Sitemap: ${users.length} users discovered, ${staticPages.length + userPages.length} URLs`)
+  return [...staticPages, ...userPages]
 }

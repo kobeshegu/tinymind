@@ -1,20 +1,24 @@
 User-agent: *
 Allow: /
 
-# Allow all user profile pages
+# Public user profile pages
 Allow: /*/
 Allow: /*/blog/
 Allow: /*/thoughts/
 Allow: /*/about/
 
-# Disallow API endpoints that are causing 5xx errors
-Disallow: /api/
-Disallow: /_next/
+# Signed-in-only routes. These render nothing useful to a crawler.
 Disallow: /editor
+Disallow: /login
 Disallow: /thoughts
 Disallow: /blog
 
-# Allow specific API endpoints that should be crawlable
+Disallow: /api/
+# The web manifest is referenced from each profile page.
 Allow: /api/manifest/
 
-Sitemap: https://tinymind.me/sitemap.xml 
+# /_next/ is deliberately crawlable: blocking it stops Google from fetching the
+# JS and CSS it needs to render the page, which degrades how the content is
+# assessed. Google's guidance is explicit about not disallowing these.
+
+Sitemap: https://tinymind.me/sitemap.xml

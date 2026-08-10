@@ -28,6 +28,17 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     manifest: "/manifest.json",
+    // These were in a next/head block, which is a no-op in the App Router, so
+    // they never reached the HTML. viewport-fit is deliberately not restored:
+    // it would change the mobile layout, which is a visual change, not a fix.
+    icons: {
+      icon: SITE_ICON,
+      apple: "/icon-144.jpg",
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+    },
     alternates: {
       canonical: baseUrl,
     },
