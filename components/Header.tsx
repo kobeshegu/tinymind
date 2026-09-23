@@ -107,24 +107,24 @@ export default function Header({
           </Link>
         </div>
       </div>
-      {isOwner && (
-        <div className="owner-toolbar">
-          <div className="owner-toolbar-inner">
-            <span className="owner-toolbar-note">
-              <Github aria-hidden="true" />
-              Editor submissions sync directly to GitHub
-            </span>
-            <Link href="/editor?type=blog" className="owner-command">
-              <FilePlus2 aria-hidden="true" />
-              New Blog
-            </Link>
-            <Link href="/editor?type=thought" className="owner-command">
-              <MessageSquarePlus aria-hidden="true" />
-              New Thought
-            </Link>
-          </div>
+      <div className="owner-toolbar">
+        <div className="owner-toolbar-inner">
+          <span className="owner-toolbar-note">
+            <Github aria-hidden="true" />
+            {isOwner
+              ? "Editor submissions sync directly to GitHub"
+              : "Author tools require the owner GitHub account"}
+          </span>
+          <Link href="/editor?type=blog" className="owner-command">
+            <FilePlus2 aria-hidden="true" />
+            New Blog
+          </Link>
+          <Link href="/editor?type=thought" className="owner-command">
+            <MessageSquarePlus aria-hidden="true" />
+            New Thought
+          </Link>
         </div>
-      )}
+      </div>
     </header>
   );
 }
