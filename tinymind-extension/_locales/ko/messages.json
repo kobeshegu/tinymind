@@ -112,7 +112,7 @@
     "description": "Error when request times out"
   },
   "notAuthenticated": {
-    "message": "인증되지 않았습니다. 먼저 tinymind.me에 로그인하세요.",
+    "message": "인증되지 않았습니다. 먼저 forevermamba.work에 로그인하세요.",
     "description": "Error when not authenticated"
   },
   "from": {

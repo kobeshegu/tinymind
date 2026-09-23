@@ -112,7 +112,7 @@
     "description": "Error when request times out"
   },
   "notAuthenticated": {
-    "message": "未登入，請先登入 tinymind.me。",
+    "message": "未登入，請先登入 forevermamba.work。",
     "description": "Error when not authenticated"
   },
   "from": {

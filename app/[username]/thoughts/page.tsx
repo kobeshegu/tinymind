@@ -12,7 +12,8 @@ export async function generateMetadata({
   params: Promise<{ username: string }>;
 }): Promise<Metadata> {
   const { username } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || "https://forevermamba.work";
   const canonicalUrl = `${baseUrl}/${username}/thoughts`;
 
   return {

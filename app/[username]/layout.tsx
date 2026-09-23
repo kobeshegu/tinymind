@@ -22,7 +22,8 @@ export async function generateMetadata({
     throw error;
   }
   const { iconPath } = await getIconUrlsForUsername(username);
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://tinymind.me";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || "https://forevermamba.work";
   const canonicalUrl = `${baseUrl}/${username}`;
 
   return {

@@ -25,17 +25,62 @@
   },
   "routes": [
     {
-      "pattern": "tinymind.me",
-      "custom_domain": true
+      "pattern": "www.forevermamba.work/*",
+      "zone_name": "forevermamba.work"
     },
     {
-      "pattern": "www.tinymind.me",
-      "custom_domain": true
+      "pattern": "forevermamba.work/blog*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/thoughts*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/editor*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/login*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/api/*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/_next/*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/kobeshegu*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/manifest.json",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/sitemap.xml",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/robots.txt",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/icon*",
+      "zone_name": "forevermamba.work"
+    },
+    {
+      "pattern": "forevermamba.work/favicon.ico*",
+      "zone_name": "forevermamba.work"
     }
   ],
   "vars": {
-    "ALLOWED_ORIGIN": "https://tinymind.me",
-    "NEXTAUTH_URL": "https://tinymind.me",
-    "NEXT_PUBLIC_BASE_URL": "https://tinymind.me"
+    "ALLOWED_ORIGIN": "https://forevermamba.work",
+    "NEXTAUTH_URL": "https://forevermamba.work",
+    "NEXT_PUBLIC_BASE_URL": "https://forevermamba.work",
+    "NEXT_PUBLIC_SITE_OWNER": "kobeshegu"
   }
 }

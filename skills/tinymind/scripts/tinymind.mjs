@@ -7,7 +7,7 @@ import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_REPOSITORY = "tinymind-blog";
-const DEFAULT_SITE = "https://tinymind.me";
+const DEFAULT_SITE = "https://forevermamba.work";
 const MAX_THOUGHT_LENGTH = 50_000;
 const MAX_ARTICLE_LENGTH = 100_000;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;

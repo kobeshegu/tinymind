@@ -136,15 +136,11 @@ async function ensureRepoExists(octokit: Octokit, owner: string, repo: string) {
     
     // Check if the repository description is empty.
     if (!repoData.description) {
-      // Get the authenticated user's login
-      const { data: userData } = await octokit.users.getAuthenticated();
-      const userLogin = userData.login;
-      
       // Update the repository with the new description
       await octokit.repos.update({
         owner,
         repo,
-        description: `https://tinymind.me/${userLogin}`,
+        description: "https://forevermamba.work/blog",
       });
     }
   } catch (error) {
@@ -170,7 +166,7 @@ async function ensureRepoExists(octokit: Octokit, owner: string, repo: string) {
           repo,
           path: 'README.md',
           message: 'Update README.md with default content',
-          content: Buffer.from('# TinyMind Blog\n\nWrite blog posts and thoughts at https://tinymind.me with data stored on GitHub.').toString('base64'),
+          content: Buffer.from('# Mengping Yang - Blog\n\nBlog posts and thoughts published at https://forevermamba.work with data stored on GitHub.').toString('base64'),
           sha: readmeContent.sha,
         });
       }
@@ -178,7 +174,7 @@ async function ensureRepoExists(octokit: Octokit, owner: string, repo: string) {
   } catch (error) {
     if (error instanceof Error && 'status' in error && error.status === 404) {
       // Create README.md if it doesn't exist
-      const content = Buffer.from('Write blog posts and thoughts at https://tinymind.me with data stored on GitHub.').toString('base64');
+      const content = Buffer.from('Blog posts and thoughts are published at https://forevermamba.work with data stored on GitHub.').toString('base64');
       await octokit.repos.createOrUpdateFileContents({
         owner,
         repo,

@@ -6,6 +6,8 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig = {
   reactStrictMode: true,
+  agentRules: false,
+  allowedDevOrigins: ['localhost', '127.0.0.1'],
   images: {
     remotePatterns: [
       {
@@ -19,7 +21,7 @@ const nextConfig = {
     // CORS configuration - supports single origin only for security
     // Set ALLOWED_ORIGIN env var to override (e.g., 'https://yourdomain.com')
     // For local development, set ALLOWED_ORIGIN=http://localhost:3000
-    const defaultOrigin = 'https://tinymind.me';
+    const defaultOrigin = 'https://forevermamba.work';
 
     // Validate and sanitize ALLOWED_ORIGIN
     const getAllowedOrigin = () => {
@@ -61,6 +63,31 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT' },
           { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.forevermamba.work' }],
+        destination: 'https://forevermamba.work/:path*',
+        permanent: true,
+      },
+      {
+        source: '/kobeshegu',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
+        source: '/kobeshegu/blog',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
+        source: '/kobeshegu/thoughts',
+        destination: '/thoughts',
+        permanent: true,
       },
     ];
   },

@@ -41,7 +41,7 @@ You can use tools like:
 
 ### Popup Editor
 
-1. **Login First**: Make sure you're logged into [tinymind.me](https://tinymind.me) in your browser
+1. **Login First**: Make sure you're logged into [forevermamba.work](https://forevermamba.work) in your browser
 2. **Click Extension**: Click the TinyMind icon in your Chrome toolbar
 3. **Write**: Type your thought in Markdown format
 4. **Preview**: Click "Preview" tab to see how it will look
@@ -64,7 +64,7 @@ You can use tools like:
 ## Requirements
 
 - Google Chrome (or Chromium-based browser)
-- Active login session on tinymind.me
+- Active login session on forevermamba.work
 - Internet connection
 
 ## How It Works
@@ -78,7 +78,7 @@ You can use tools like:
 
 ### "Please log in to TinyMind first"
 
-- Open [tinymind.me](https://tinymind.me) and log in with GitHub
+- Open [forevermamba.work](https://forevermamba.work) and log in with GitHub
 - Make sure you're logged in (check if you see your profile)
 - Try again with the extension
 
@@ -96,7 +96,7 @@ You can use tools like:
 
 ## Privacy
 
-- This extension only communicates with tinymind.me
+- This extension only communicates with forevermamba.work
 - No data is sent to third parties
 - Your session cookie is used securely for authentication
 - All data is stored in your own GitHub repository

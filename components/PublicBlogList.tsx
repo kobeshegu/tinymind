@@ -3,6 +3,9 @@
 import { useMemo, memo } from "react";
 import type { BlogPost } from "@/lib/contentTypes";
 import Link from "next/link";
+import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
+import { stripFrontmatter } from "@/lib/content";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -12,9 +15,11 @@ function formatDate(dateString: string): string {
 function PublicBlogListComponent({
   posts,
   username,
+  basePath,
 }: {
   posts: BlogPost[];
   username: string;
+  basePath?: string;
 }) {
   // Use useMemo instead of useEffect+useState for sorting
   const sortedPosts = useMemo(() =>
@@ -25,13 +30,8 @@ function PublicBlogListComponent({
   // Show message if no posts
   if (posts.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12">
-        <div className="text-center">
-          <p className="text-gray-500">No blog posts yet.</p>
-          <p className="text-sm text-gray-400 mt-2">
-            {username} hasn&apos;t published any blog posts.
-          </p>
-        </div>
+      <div className="empty-state">
+        <p>No essays published yet.</p>
       </div>
     );
   }
@@ -48,29 +48,53 @@ function PublicBlogListComponent({
   );
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
+    <div className="writing-index">
       {sortedYears.map((year) => (
-        <div key={year} className="mb-16">
-          <h2 className="text-2xl font-serif font-light text-gray-400 mb-6">
-            {year}
-          </h2>
-          <ul className="space-y-4">
+        <section key={year} className="writing-year">
+          <h2>{year}</h2>
+          <ol>
             {groupedPosts[Number(year)].map((post) => (
-              <li key={post.id} className="flex items-center">
-                <Link
-                  href={`/${username}/blog/${encodeURIComponent(post.id)}`}
-                  className="text-gray-700 hover:text-gray-400 transition-colors duration-200"
-                >
-                  {post.title}
-                </Link>
-                <span className="flex-grow border-b border-dotted border-gray-300 mx-2" />
-                <span className="text-sm text-gray-400 font-light whitespace-nowrap">
-                  {formatDate(post.date)}
-                </span>
+              <li key={post.id}>
+                <details className="writing-entry">
+                  <summary>
+                    <span className="writing-title">{post.title}</span>
+                    <span className="writing-meta">
+                      <time dateTime={post.date}>{formatDate(post.date)}</time>
+                      <span className="disclosure-label">
+                        <span className="label-expand">Expand</span>
+                        <span className="label-collapse">Collapse</span>
+                        <ChevronDown
+                          className="icon-expand"
+                          aria-hidden="true"
+                        />
+                        <ChevronUp
+                          className="icon-collapse"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </span>
+                  </summary>
+                  <div className="writing-preview">
+                    <div className="prose max-w-none">
+                      <MarkdownRenderer
+                        content={stripFrontmatter(post.content)}
+                      />
+                    </div>
+                    <Link
+                      href={`${
+                        basePath ?? `/${username}/blog`
+                      }/${encodeURIComponent(post.id)}`}
+                      className="writing-open"
+                    >
+                      Open article
+                      <ArrowUpRight aria-hidden="true" />
+                    </Link>
+                  </div>
+                </details>
               </li>
             ))}
-          </ul>
-        </div>
+          </ol>
+        </section>
       ))}
     </div>
   );

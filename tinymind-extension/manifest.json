@@ -10,7 +10,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://tinymind.me/*"
+    "https://forevermamba.work/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",

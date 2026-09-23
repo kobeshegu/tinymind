@@ -112,7 +112,7 @@
     "description": "Error when request times out"
   },
   "notAuthenticated": {
-    "message": "認証されていません。まずtinymind.meにログインしてください。",
+    "message": "認証されていません。まずforevermamba.workにログインしてください。",
     "description": "Error when not authenticated"
   },
   "from": {

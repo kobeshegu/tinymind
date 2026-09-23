@@ -1,7 +1,7 @@
 // TinyMind Extension - Background Service Worker
-// Handles API communication with tinymind.me
+// Handles API communication with forevermamba.work
 
-const API_BASE = 'https://tinymind.me/api/github';
+const API_BASE = 'https://forevermamba.work/api/github';
 const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout
 
 // Track badge timers by tab ID to prevent memory leaks
@@ -116,7 +116,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
  */
 async function checkAuthStatus() {
   try {
-    const cookies = await chrome.cookies.getAll({ domain: 'tinymind.me' });
+    const cookies = await chrome.cookies.getAll({ domain: 'forevermamba.work' });
 
     // next-auth uses different cookie names based on environment
     // Production (HTTPS): __Secure-next-auth.session-token
@@ -155,7 +155,7 @@ async function createThought(content, imageUrl) {
       const errorData = await response.json().catch(() => ({}));
 
       if (response.status === 401) {
-        return { success: false, error: 'Not authenticated. Please log in to tinymind.me first.' };
+        return { success: false, error: 'Not authenticated. Please log in to forevermamba.work first.' };
       }
 
       return {
@@ -200,7 +200,7 @@ async function uploadImage(dataUrl, fileName, mimeType) {
       const errorData = await uploadResponse.json().catch(() => ({}));
 
       if (uploadResponse.status === 401) {
-        return { success: false, error: 'Not authenticated. Please log in to tinymind.me first.' };
+        return { success: false, error: 'Not authenticated. Please log in to forevermamba.work first.' };
       }
 
       return {

@@ -21,4 +21,4 @@ Allow: /api/manifest/
 # JS and CSS it needs to render the page, which degrades how the content is
 # assessed. Google's guidance is explicit about not disallowing these.
 
-Sitemap: https://tinymind.me/sitemap.xml
+Sitemap: https://forevermamba.work/sitemap.xml

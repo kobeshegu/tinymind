@@ -112,7 +112,7 @@
     "description": "Error when request times out"
   },
   "notAuthenticated": {
-    "message": "Nicht authentifiziert. Bitte melden Sie sich zuerst bei tinymind.me an.",
+    "message": "Nicht authentifiziert. Bitte melden Sie sich zuerst bei forevermamba.work an.",
     "description": "Error when not authenticated"
   },
   "from": {

@@ -17,6 +17,12 @@ describe("assertPublicProfile", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("trusts the configured site owner without a marker request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(assertPublicProfile("KoBeShEgU")).resolves.toBe("kobeshegu");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("maps a missing repository marker to a 404", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 404 }));
     await expect(assertPublicProfile("missing-profile-test")).rejects.toMatchObject({

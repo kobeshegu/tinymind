@@ -1,29 +1,36 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServerMarkdownRenderer } from "@/components/shared/ServerMarkdownRenderer";
 import { format } from "date-fns";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export function PublicBlogPostContent({
   title,
   date,
   content,
+  backHref = "/blog",
 }: {
   title: string;
   date: string;
   content: string;
+  backHref?: string;
 }) {
   return (
-    <Card className="mx-auto mt-8 max-w-3xl">
-      <CardHeader>
-        <CardTitle className="text-3xl font-bold">{title}</CardTitle>
-        <p className="text-sm text-gray-500">
-          {format(new Date(date), "MMMM d, yyyy")}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="prose max-w-none dark:prose-invert">
+    <article className="article-shell">
+      <Link href={backHref} className="article-back">
+        <ArrowLeft aria-hidden="true" />
+        All writing
+      </Link>
+      <header className="article-header">
+        <p className="page-kicker">Essay</p>
+        <h1>{title}</h1>
+        <time dateTime={date}>{format(new Date(date), "MMMM d, yyyy")}</time>
+      </header>
+      <div className="article-rule" />
+      <div className="article-body">
+        <div className="prose max-w-none">
           <ServerMarkdownRenderer content={content} />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }

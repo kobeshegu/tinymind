@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import EditorComponent from "@/components/Editor";
 import GitHubSignInButton from "@/components/GitHubSignInButton";
+import { notFound } from "next/navigation";
+import { SITE_OWNER } from "@/lib/site";
 
 export default async function EditorPage({
   searchParams,
@@ -19,6 +21,10 @@ export default async function EditorPage({
 
   if (!session) {
     return <GitHubSignInButton />;
+  }
+
+  if (session.user?.username?.toLowerCase() !== SITE_OWNER.toLowerCase()) {
+    notFound();
   }
 
   return (

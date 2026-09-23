@@ -4,6 +4,7 @@ import { Octokit } from "@octokit/rest";
 import { BoundedCache, registerInvalidatableCache } from "./cache";
 import {
   getAboutPagePublic,
+  getBlogPostsPublic,
   getBlogPostsPublicFast,
   getThoughtsPublic,
 } from "./githubApi";
@@ -44,6 +45,17 @@ export async function assertPublicProfile(username: string): Promise<string> {
   }
 
   const owner = parsed.data.toLowerCase();
+  const siteOwner = (
+    process.env.NEXT_PUBLIC_SITE_OWNER?.trim() || "kobeshegu"
+  ).toLowerCase();
+
+  // The configured site owner is trusted and powers the custom-domain pages.
+  // Avoid making those pages depend on a separate raw.githubusercontent.com
+  // HEAD request before the actual content request.
+  if (owner === siteOwner) {
+    return owner;
+  }
+
   const profileKey = `profile:${owner}:${PUBLIC_REPO}`;
   const cached = profileCache.get(profileKey);
   if (cached === true) {
@@ -106,11 +118,13 @@ export async function getPublicBlogPosts(username: string): Promise<BlogPost[]> 
     return cached;
   }
 
-  const blogPosts = await getBlogPostsPublicFast(
-    createPublicOctokit(),
-    owner,
-    PUBLIC_REPO
+  const hasGitHubToken = Boolean(
+    process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN
   );
+  const octokit = createPublicOctokit();
+  const blogPosts = hasGitHubToken
+    ? await getBlogPostsPublicFast(octokit, owner, PUBLIC_REPO)
+    : await getBlogPostsPublic(octokit, owner, PUBLIC_REPO);
   blogCache.set(cacheKey, blogPosts);
   return blogPosts;
 }
