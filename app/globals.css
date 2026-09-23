@@ -131,6 +131,7 @@
 
 .site-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 4px;
 }
@@ -153,6 +154,76 @@
 .icon-link svg {
   width: 18px;
   height: 18px;
+}
+
+.header-sign-in,
+.owner-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: color 160ms ease, background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.header-sign-in {
+  padding: 0 11px;
+  color: #59686d;
+}
+
+.header-sign-in:hover {
+  background: #e8eeef;
+  color: #172126;
+}
+
+.header-sign-in svg,
+.owner-command svg,
+.owner-toolbar-note svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.owner-toolbar {
+  border-top: 1px solid rgba(205, 216, 219, 0.7);
+  background: #f1f6f6;
+}
+
+.owner-toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: min(1120px, calc(100% - 32px));
+  min-height: 52px;
+  margin: 0 auto;
+}
+
+.owner-toolbar-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+  color: #637378;
+  font-size: 12px;
+}
+
+.owner-command {
+  min-width: 112px;
+  padding: 0 13px;
+  border: 1px solid #b8c9cc;
+  background: #ffffff;
+  color: #172126;
+}
+
+.owner-command:hover {
+  border-color: #00a6a6;
+  background: #e5f7f5;
+  color: #006f6f;
 }
 
 .page-shell {
@@ -788,6 +859,25 @@ details[open] .icon-collapse {
 @media (max-width: 640px) {
   .site-header-inner {
     width: min(100% - 24px, 1120px);
+  }
+
+  .header-sign-in {
+    width: 38px;
+    padding: 0;
+  }
+
+  .header-sign-in span,
+  .owner-toolbar-note {
+    display: none;
+  }
+
+  .owner-toolbar-inner {
+    width: min(100% - 24px, 1120px);
+  }
+
+  .owner-command {
+    flex: 1;
+    min-width: 0;
   }
 
   .site-brand > span:last-child {

@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Github, Home, LogIn, PenLine } from "lucide-react";
+import {
+  FilePlus2,
+  Github,
+  Home,
+  LogIn,
+  MessageSquarePlus,
+} from "lucide-react";
 import { SITE_NAME, SITE_OWNER } from "@/lib/site";
 
 const APP_ROUTES = new Set([
@@ -31,7 +37,7 @@ export default function Header({
   username?: string;
 }) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const publicUsername =
     propUsername ?? publicUsernameFromPath(pathname);
   const profileBase = publicUsername ? `/${publicUsername}` : "";
@@ -80,24 +86,13 @@ export default function Header({
           <Link href="/" className="icon-link" aria-label="Home" title="Home">
             <Home aria-hidden="true" />
           </Link>
-          {isOwner && (
-            <Link
-              href="/editor?type=blog"
-              className="icon-link"
-              aria-label="Write"
-              title="Write"
-            >
-              <PenLine aria-hidden="true" />
-            </Link>
-          )}
-          {!session?.user && (
+          {status === "unauthenticated" && (
             <Link
               href="/login"
-              className="icon-link"
-              aria-label="Owner sign in"
-              title="Owner sign in"
+              className="header-sign-in"
             >
               <LogIn aria-hidden="true" />
+              <span>Owner sign in</span>
             </Link>
           )}
           <Link
@@ -112,6 +107,24 @@ export default function Header({
           </Link>
         </div>
       </div>
+      {isOwner && (
+        <div className="owner-toolbar">
+          <div className="owner-toolbar-inner">
+            <span className="owner-toolbar-note">
+              <Github aria-hidden="true" />
+              Editor submissions sync directly to GitHub
+            </span>
+            <Link href="/editor?type=blog" className="owner-command">
+              <FilePlus2 aria-hidden="true" />
+              New Blog
+            </Link>
+            <Link href="/editor?type=thought" className="owner-command">
+              <MessageSquarePlus aria-hidden="true" />
+              New Thought
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

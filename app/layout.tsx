@@ -7,7 +7,6 @@ import Footer from "@/components/Footer";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Toaster } from "@/components/ui/toaster";
-import CreateButton from "@/components/CreateButton";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 const SITE_ICON = "/icon.jpg";
@@ -92,7 +91,6 @@ export default async function RootLayout({
             <Header />
             <main className="site-main">{children}</main>
             <Footer />
-            <CreateButton messages={messages} />
             <Toaster />
           </SessionProvider>
         </NextIntlClientProvider>

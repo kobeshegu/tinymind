@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Check, Github, Loader2 } from "lucide-react";
 import { CgImage } from "react-icons/cg";
 import { useTranslations } from "next-intl";
 import type { Thought } from "@/lib/contentTypes";
@@ -537,11 +537,9 @@ export default function Editor({
             </div>
 
             {isSuccess && (
-              <div className="text-xs font-normal text-gray-400 text-center m-2">
-                {type === "about"
-                  ? t("aboutPageSuccessMessage") ||
-                    "About page published successfully"
-                  : t("successPublished")}
+              <div className="flex items-center justify-center gap-2 text-sm font-medium text-[#087f79] m-2">
+                <Check className="h-4 w-4" aria-hidden="true" />
+                Synced to GitHub. Opening the published page...
               </div>
             )}
 
@@ -549,15 +547,18 @@ export default function Editor({
               <Button
                 type="submit"
                 disabled={isLoading || isImageUploading}
-                className="px-12 py-5 bg-black hover:bg-gray-800"
+                className="px-8 py-5 bg-[#172126] hover:bg-[#25343b]"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("publishing")}
+                    Syncing to GitHub...
                   </>
                 ) : (
-                  t("publish")
+                  <>
+                    <Github className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Sync to GitHub
+                  </>
                 )}
               </Button>
             </div>
