@@ -126,7 +126,7 @@ async function getRepoInfo(accessToken: string | undefined) {
     // redacts the authorization header. Gating this on isDev meant production
     // emitted no diagnostics at all.
     console.error('Error getting authenticated user:', error);
-    throw new Error('Failed to get authenticated user');
+    throw error;
   }
 }
 

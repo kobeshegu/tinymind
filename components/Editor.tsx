@@ -68,6 +68,7 @@ export default function Editor({
   const [isLoading, setIsLoading] = useState(false);
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const t = useTranslations("HomePage");
   const { data: session } = useSession();
@@ -170,6 +171,7 @@ export default function Editor({
     e.preventDefault();
     setIsLoading(true);
     setIsSuccess(false);
+    setSubmitError(null);
     try {
       let action: string;
 
@@ -201,7 +203,10 @@ export default function Editor({
       });
 
       if (!response.ok) {
-        throw new Error(t("failedPublish"));
+        const errorData = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(errorData?.error || t("failedPublish"));
       }
 
       const responseData = await response.json();
@@ -233,9 +238,12 @@ export default function Editor({
       }, 2000);
     } catch (error) {
       console.error("Error publishing:", error);
+      const message =
+        error instanceof Error ? error.message : t("failedPublish");
+      setSubmitError(message);
       toast({
         title: t("error"),
-        description: t("failedPublish"),
+        description: message,
         variant: "destructive",
         duration: 3000,
       });
@@ -540,6 +548,15 @@ export default function Editor({
               <div className="flex items-center justify-center gap-2 text-sm font-medium text-[#087f79] m-2">
                 <Check className="h-4 w-4" aria-hidden="true" />
                 Synced to GitHub. Opening the published page...
+              </div>
+            )}
+
+            {submitError && (
+              <div
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                role="alert"
+              >
+                {submitError}
               </div>
             )}
 

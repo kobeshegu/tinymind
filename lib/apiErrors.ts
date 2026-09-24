@@ -106,21 +106,53 @@ export function createErrorResponse(
 
     if (status === 401) {
       return NextResponse.json(
-        { error: 'Authentication required', code: ErrorCodes.UNAUTHORIZED },
+        {
+          error: 'GitHub authorization expired. Sign out and connect GitHub again.',
+          code: ErrorCodes.UNAUTHORIZED,
+        },
         { status: 401, headers }
       );
     }
 
-    if (status === 403 || status === 429) {
+    if (status === 403) {
+      const message =
+        'message' in error && typeof error.message === 'string'
+          ? error.message.toLowerCase()
+          : '';
+      const isRateLimit =
+        message.includes('rate limit') || message.includes('abuse detection');
+
       return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.', code: ErrorCodes.RATE_LIMITED },
+        isRateLimit
+          ? {
+              error: 'GitHub rate limit exceeded. Please try again later.',
+              code: ErrorCodes.RATE_LIMITED,
+            }
+          : {
+              error:
+                'GitHub denied write access. Reconnect GitHub and approve public repository access.',
+              code: ErrorCodes.FORBIDDEN,
+            },
+        { status: isRateLimit ? 429 : 403, headers }
+      );
+    }
+
+    if (status === 429) {
+      return NextResponse.json(
+        {
+          error: 'GitHub rate limit exceeded. Please try again later.',
+          code: ErrorCodes.RATE_LIMITED,
+        },
         { status: 429, headers }
       );
     }
 
     if (status === 404) {
       return NextResponse.json(
-        { error: 'Resource not found', code: ErrorCodes.NOT_FOUND },
+        {
+          error: 'The GitHub repository was not found or is not accessible.',
+          code: ErrorCodes.NOT_FOUND,
+        },
         { status: 404, headers }
       );
     }
@@ -129,6 +161,17 @@ export function createErrorResponse(
       return NextResponse.json(
         { error: 'Resource conflict. Please retry.', code: ErrorCodes.CONFLICT },
         { status: 409, headers }
+      );
+    }
+
+    if (status === 422) {
+      return NextResponse.json(
+        {
+          error:
+            'GitHub rejected the change. A blog post with the same title may already exist.',
+          code: ErrorCodes.VALIDATION_ERROR,
+        },
+        { status: 422, headers }
       );
     }
   }
